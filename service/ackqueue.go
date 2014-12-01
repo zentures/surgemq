@@ -20,7 +20,6 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dataence/bithacks"
 	"github.com/surge/surgemq/message"
 )
 
@@ -61,8 +60,8 @@ type ackqueue struct {
 
 func newAckqueue(n int) *ackqueue {
 	m := int64(n)
-	if !bithacks.PowerOfTwo(n) {
-		m = bithacks.RoundUpPowerOfTwo64(m)
+	if !PowerOfTwo64(m) {
+		m = RoundUpPowerOfTwo64(m)
 	}
 
 	return &ackqueue{
@@ -77,15 +76,6 @@ func newAckqueue(n int) *ackqueue {
 	}
 }
 
-// Len() returns the length of the queue. However, it is likely invalid as there's
-// a possibility where
-// 		1. an ackmsg is removed from the queue
-//		2. the ackmsg is inserted into the channel
-//		3. another ackmsg is removed from the queue
-// In this case, the result of Len() is n-2, but the caller maybe expecting the
-// Len() to be n-1 if they just read from the channel, or the caller maybe expecting
-// the Len() to be n-2 if they haven't read from the channel yet.
-// TODO: Fix Len() so it's correct
 func (this *ackqueue) Len() int {
 	return int(this.count)
 }

@@ -20,8 +20,6 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
-
-	"github.com/dataence/bithacks"
 )
 
 var (
@@ -86,8 +84,8 @@ func newBuffer(size int64) (*buffer, error) {
 		size = defaultBufferSize
 	}
 
-	if !bithacks.PowerOfTwo64(size) {
-		return nil, fmt.Errorf("Size must be power of two. Try %d.", bithacks.RoundUpPowerOfTwo64(size))
+	if !PowerOfTwo64(size) {
+		return nil, fmt.Errorf("Size must be power of two. Try %d.", RoundUpPowerOfTwo64(size))
 	}
 
 	if size < 2*defaultReadBlockSize {
