@@ -84,7 +84,9 @@ func (this *service) processor() {
 			return
 		}
 
-		//glog.Debugf("(%d) got %s msg len = %d", this.id, msg.Name(), msg.Len())
+		if this.client {
+			glog.Debugf("(%d) got %s msg len = %d", this.id, msg.Name(), msg.Len())
+		}
 
 		// 5. Process the read message
 		err = this.processIncoming(msg)
@@ -354,14 +356,14 @@ func (this *service) onPublish(msg *message.PublishMessage) error {
 }
 
 func (this *service) serverPublish(msg *message.PublishMessage) error {
-	subs, qoss, err := this.ctx.Topics.Subscribers(msg.Topic(), msg.QoS())
+	err := this.ctx.Topics.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
 	if err != nil {
 		return err
 	}
 
-	glog.Debugf("(%d) Publishing to %d clients", this.id, len(subs))
+	glog.Debugf("(%d) Publishing to %d clients", this.id, len(this.subs))
 
-	for i, s := range subs {
+	for i, s := range this.subs {
 		svc, ok := s.(*service)
 		if !ok {
 			//glog.Errorf("Invalid subscriber")
@@ -369,7 +371,7 @@ func (this *service) serverPublish(msg *message.PublishMessage) error {
 			go svc.Disconnect()
 		} else {
 			//glog.Debugf("(%d) publishing to client %s with packetID %d qos %d", this.id, svc.cid, msg.PacketId(), qoss[i])
-			msg.SetQoS(qoss[i])
+			msg.SetQoS(this.qoss[i])
 			err := svc.Publish(msg, nil)
 			if err == ErrBufferNotReady {
 				glog.Errorf("Disconnecting client: %v", err)
@@ -382,14 +384,14 @@ func (this *service) serverPublish(msg *message.PublishMessage) error {
 }
 
 func (this *service) clientPublish(msg *message.PublishMessage) error {
-	subs, _, err := this.ctx.Topics.Subscribers(msg.Topic(), msg.QoS())
+	err := this.ctx.Topics.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
 	if err != nil {
 		return err
 	}
 
 	//glog.Debugf("(%d) Found %d clients", this.id, len(subs))
 
-	for _, s := range subs {
+	for _, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(OnPublishFunc)
 			if !ok {

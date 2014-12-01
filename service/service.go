@@ -100,10 +100,13 @@ type service struct {
 
 	intmp  []byte
 	outtmp []byte
+
+	subs []interface{}
+	qoss []byte
 }
 
 func (this *service) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
-	glog.Debugf("(%d) sending %s qos = %d pktid = %d", this.id, msg.Name(), msg.QoS(), msg.PacketId())
+	//glog.Debugf("(%d) sending %s qos = %d pktid = %d", this.id, msg.Name(), msg.QoS(), msg.PacketId())
 	if msg.QoS() == 0 {
 		_, err := this.writeMessage(msg)
 		if err != nil {

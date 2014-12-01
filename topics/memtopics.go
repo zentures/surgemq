@@ -19,6 +19,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
 )
 
@@ -29,8 +30,6 @@ var (
 type MemTopics struct {
 	mu   sync.RWMutex
 	root *node
-	subs []interface{}
-	qoss []byte
 }
 
 var _ Topics = (*MemTopics)(nil)
@@ -38,8 +37,6 @@ var _ Topics = (*MemTopics)(nil)
 func NewMemTopics() *MemTopics {
 	return &MemTopics{
 		root: newNode(),
-		subs: make([]interface{}, 0, 10),
-		qoss: make([]byte, 0, 10),
 	}
 }
 
@@ -76,22 +73,20 @@ func (this *MemTopics) Unsubscribe(topic []byte, sub interface{}) error {
 }
 
 // Returned values will be invalidated by the next Subscribers call
-func (this *MemTopics) Subscribers(topic []byte, qos byte) ([]interface{}, []byte, error) {
+func (this *MemTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+	if !message.ValidQos(qos) {
+		return fmt.Errorf("Invalid QoS %d", qos)
+	}
+
 	this.mu.RLock()
 	defer this.mu.RUnlock()
 
-	if !message.ValidQos(qos) {
-		return nil, nil, fmt.Errorf("Invalid QoS %d", qos)
-	}
+	*subs = (*subs)[0:0]
+	*qoss = (*qoss)[0:0]
 
-	this.subs = this.subs[0:0]
-	this.qoss = this.qoss[0:0]
+	glog.Debugf("len subs = %d", len(*subs))
 
-	if err := this.root.match(topic, qos, &this.subs, &this.qoss); err != nil {
-		return nil, nil, err
-	}
-
-	return this.subs, this.qoss, nil
+	return this.root.match(topic, qos, subs, qoss)
 }
 
 type node struct {
@@ -320,6 +315,8 @@ func (this *node) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
 			*qoss = append(*qoss, qos)
 		}
 	}
+
+	glog.Debugf("Added %d subscribers", len(*subs))
 }
 
 func equal(k1, k2 interface{}) bool {

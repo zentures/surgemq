@@ -42,5 +42,5 @@ const (
 type Topics interface {
 	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
-	Subscribers(topic []byte, qos byte) ([]interface{}, []byte, error)
+	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
 }

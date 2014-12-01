@@ -264,10 +264,8 @@ func TestNodeMatch1(t *testing.T) {
 	topic := []byte("sport/tennis/player1/#")
 	n.insert(topic, 1, "sub1")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
 	err := n.match([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
 
@@ -276,19 +274,15 @@ func TestNodeMatch1(t *testing.T) {
 	assert.Equal(t, true, 1, qoss[0])
 }
 
-// Test QoS being minimum of the QoS of the originally published message and
-// the maximum QoS granted by the server.
 func TestNodeMatch2(t *testing.T) {
 	n := newNode()
 	topic := []byte("sport/tennis/player1/#")
 	n.insert(topic, 1, "sub1")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
+	err := n.match([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
@@ -296,17 +290,13 @@ func TestNodeMatch2(t *testing.T) {
 
 }
 
-// Test QoS being minimum of the QoS of the originally published message and
-// the maximum QoS granted by the server.
 func TestNodeMatch3(t *testing.T) {
 	n := newNode()
 	topic := []byte("sport/tennis/player1/#")
 	n.insert(topic, 2, "sub1")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
 	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
 
@@ -317,18 +307,16 @@ func TestNodeMatch3(t *testing.T) {
 
 func TestNodeMatch4(t *testing.T) {
 	n := newNode()
-	n.insert([]byte("sport/tennis/#"), 1, "sub1")
+	n.insert([]byte("sport/tennis/#"), 2, "sub1")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
 	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
-	assert.Equal(t, true, 1, qoss[0])
+	assert.Equal(t, true, 2, qoss[0])
 }
 
 func TestNodeMatch5(t *testing.T) {
@@ -336,12 +324,10 @@ func TestNodeMatch5(t *testing.T) {
 	n.insert([]byte("sport/tennis/+/anzel"), 1, "sub1")
 	n.insert([]byte("sport/tennis/player1/anzel"), 1, "sub2")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
+	err := n.match([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 2, len(subs))
@@ -352,10 +338,8 @@ func TestNodeMatch6(t *testing.T) {
 	n.insert([]byte("sport/tennis/#"), 2, "sub1")
 	n.insert([]byte("sport/tennis"), 1, "sub2")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
 	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
 
@@ -368,10 +352,21 @@ func TestNodeMatch7(t *testing.T) {
 	n := newNode()
 	n.insert([]byte("+/+"), 2, "sub1")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
+
+	err := n.match([]byte("/finance"), 1, &subs, &qoss)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(subs))
+}
+
+func TestNodeMatch8(t *testing.T) {
+	n := newNode()
+	n.insert([]byte("/+"), 2, "sub1")
+
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
 	err := n.match([]byte("/finance"), 1, &subs, &qoss)
 
@@ -383,30 +378,13 @@ func TestNodeMatch9(t *testing.T) {
 	n := newNode()
 	n.insert([]byte("+"), 2, "sub1")
 
-	var (
-		subs []interface{}
-		qoss []byte
-	)
+	subs := make([]interface{}, 0, 5)
+	qoss := make([]byte, 0, 5)
 
 	err := n.match([]byte("/finance"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 0, len(subs))
-}
-
-func TestNodeMatch8(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("/+"), 2, "sub1")
-
-	var (
-		subs []interface{}
-		qoss []byte
-	)
-
-	err := n.match([]byte("/finance"), 1, &subs, &qoss)
-
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(subs))
 }
 
 func TestMemTopics(t *testing.T) {
@@ -421,7 +399,15 @@ func TestMemTopics(t *testing.T) {
 
 	assert.Error(t, true, err)
 
-	subs, qoss, err := topics.Subscribers([]byte("sports/tennis/anzel/stats"), 2)
+	subs := make([]interface{}, 5)
+	qoss := make([]byte, 5)
+
+	err = topics.Subscribers([]byte("sports/tennis/anzel/stats"), 2, &subs, &qoss)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 0, len(subs))
+
+	err = topics.Subscribers([]byte("sports/tennis/anzel/stats"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
