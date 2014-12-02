@@ -171,7 +171,7 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 				return total, err
 			}
 
-			_, err = this.ReadCommit(len(p))
+			_, err = this.ReadCommit(n)
 			if err != nil {
 				return total, err
 			}
@@ -396,7 +396,7 @@ func (this *buffer) ReadWait(n int) ([]byte, error) {
 		l := len(this.buf[cindex:])
 		this.tmp = append(this.tmp, this.buf[cindex:]...)
 		this.tmp = append(this.tmp, this.buf[0:n-l]...)
-		return this.tmp, nil
+		return this.tmp[:n], nil
 	}
 
 	return this.buf[cindex : cindex+int64(n)], nil
@@ -464,6 +464,7 @@ func (this *buffer) WriteCommit(n int) (int, error) {
 
 	// If we are here then there's enough bytes to commit
 	this.pseq.set(start + int64(cnt))
+
 	this.ccond.L.Lock()
 	this.ccond.Broadcast()
 	this.ccond.L.Unlock()
