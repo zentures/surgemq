@@ -77,7 +77,6 @@ func listenAndConnect(t testing.TB, u *url.URL, ready chan struct{}) net.Conn {
 
 	close(ready)
 
-	//glog.Debugf("waiting for connection...")
 	conn, err := ln.Accept()
 	assert.NoError(t, true, err)
 

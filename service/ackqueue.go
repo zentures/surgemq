@@ -192,11 +192,8 @@ func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCom
 }
 
 func (this *ackqueue) ack(pktid uint16, msg message.Message) {
-	//glog.Debugf("acking %s id %d", msg.Name(), pktid)
-
 	i, ok := this.emap[pktid]
 	if ok {
-		//glog.Debugf("found %d in emap[%d]", pktid, i)
 		this.ring[i].state = msg.Type()
 		this.ring[i].ack = msg
 
@@ -226,7 +223,6 @@ func (this *ackqueue) grow() {
 	newmask := newsize - 1
 	newring := make([]ackmsg, newsize)
 
-	//glog.Debugf("newsize = %d", newsize)
 	if this.tail > this.head {
 		copy(newring, this.ring[this.head:this.tail])
 	} else {

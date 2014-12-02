@@ -27,19 +27,17 @@ func (this *service) processor() {
 		this.wg.Done()
 		this.close()
 
-		glog.Debugf("(%d) Stopping processor", this.id)
+		glog.Debugf("(%s) Stopping processor", this.cid)
 	}()
 
-	glog.Debugf("(%d) Starting processor", this.id)
+	glog.Debugf("(%s) Starting processor", this.cid)
 
 	for {
-		//glog.Debugf("(%d) Waiting for next message", this.id)
-
 		// 1. Find out what message is next and the size of the message
 		mtype, qos, total, err := this.peekMessageSize()
 		if err != nil {
 			if err != io.EOF {
-				glog.Errorf("(%d) Error peeking next message size: %v", this.id, err)
+				glog.Errorf("(%s) Error peeking next message size: %v", this.cid, err)
 			}
 			return
 		}
@@ -64,7 +62,7 @@ func (this *service) processor() {
 			msg, _, err = this.readMessage(mtype, total)
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%d) Error reading next message: %v", this.id, err)
+					glog.Errorf("(%s) Error reading next message: %v", this.cid, err)
 				}
 				return
 			}
@@ -72,7 +70,7 @@ func (this *service) processor() {
 			msg, _, err = this.peekMessage(mtype, total)
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%d) Error peeking next message: %v", this.id, err)
+					glog.Errorf("(%s) Error peeking next message: %v", this.cid, err)
 				}
 				return
 			}
@@ -84,10 +82,6 @@ func (this *service) processor() {
 			return
 		}
 
-		if this.client {
-			glog.Debugf("(%d) got %s msg len = %d", this.id, msg.Name(), msg.Len())
-		}
-
 		// 5. Process the read message
 		err = this.processIncoming(msg)
 		if err != nil {
@@ -97,10 +91,10 @@ func (this *service) processor() {
 		// 6. If this was a peek, then we should commit the bytes in the buffer so we
 		//    can move on
 		if peek {
-			_, err := this.commitRead(this.in, total)
+			_, err := this.in.ReadCommit(total)
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%d) Error committing %d read bytes: %v", this.id, total, err)
+					glog.Errorf("(%s) Error committing %d read bytes: %v", this.cid, total, err)
 				}
 				return
 			}
@@ -132,8 +126,6 @@ func (this *service) processAcked() {
 	for _, ackmsg := range this.ack.Acked() {
 		var err error = nil
 
-		glog.Debugf("(%d) %s got acked", this.id, ackmsg.msg.Name())
-
 		switch ackmsg.msg.Type() {
 		case message.PUBLISH:
 			// If ack is PUBACK, that means this service sent the message and it got
@@ -164,10 +156,6 @@ func (this *service) processAcked() {
 }
 
 func (this *service) processIncoming(msg message.Message) error {
-	//if !this.client {
-	//glog.Debugf("(%d) Processing %s message", this.id, msg.Name())
-	//}
-
 	switch msg := msg.(type) {
 	case *message.PublishMessage:
 		// For PUBLISH message, we should figure out what QoS it is and process accordingly
@@ -236,8 +224,6 @@ func (this *service) processIncoming(msg message.Message) error {
 // If QoS == 1, we should send back PUBACK, then take the next step
 // If QoS == 2, we need to put it in the ack queue, send back PUBREC
 func (this *service) processPublish(msg *message.PublishMessage) error {
-	//glog.Debugf("(%d) Received %s, topic = %s, qos = %d, pktid = %d", this.id, msg.Name(), string(msg.Topic()), msg.QoS(), msg.PacketId())
-
 	switch msg.QoS() {
 	case message.QosExactlyOnce:
 		this.ack.AckWait(msg, nil)
@@ -267,8 +253,6 @@ func (this *service) processPublish(msg *message.PublishMessage) error {
 
 // For PUBREC message, it means QoS 2, we should send to ack queue, and send back PUBREL
 func (this *service) processPubrec(msg *message.PubrecMessage) error {
-	//glog.Debugf("(%s) Received %s %d", this.cid, msg.Name(), msg.PacketId())
-
 	this.ack.Ack(msg)
 
 	resp := message.NewPubrelMessage()
@@ -280,8 +264,6 @@ func (this *service) processPubrec(msg *message.PubrecMessage) error {
 
 // For PUBREL message, it means QoS 2, we should send to ack queue, and send back PUBCOMP
 func (this *service) processPubrel(msg *message.PubrelMessage) error {
-	//glog.Debugf("(%d) Received %s %d", this.id, msg.Name(), msg.PacketId())
-
 	this.ack.Ack(msg)
 
 	resp := message.NewPubcompMessage()
@@ -303,22 +285,16 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 	qos := msg.Qos()
 
 	for i, t := range topics {
-		//glog.Debugf("(%d) Subscribing to %s (%d)", this.id, string(t), qos[i])
 		rqos, err := this.ctx.Topics.Subscribe(t, qos[i], this)
 		if err != nil {
 			return err
 		}
 		this.sess.AddTopic(string(t), qos[i])
 
-		//if rqos == message.QosFailure {
-		//	glog.Errorf("(%d) error subscribing to topic %s, qos %d", this.id, t, qos)
-		//}
-
 		retcodes = append(retcodes, rqos)
 	}
 
 	if err := resp.AddReturnCodes(retcodes); err != nil {
-		//glog.Errorf("(%d) error adding return code: %v", this.id, err)
 		return err
 	}
 
@@ -330,11 +306,7 @@ func (this *service) processUnsubscribe(msg *message.UnsubscribeMessage) error {
 	topics := msg.Topics()
 
 	for _, t := range topics {
-		//glog.Debugf("(%d) Unsubscribing to %s", this.id, string(t))
-		err := this.ctx.Topics.Unsubscribe(t, this)
-		if err != nil {
-			//glog.Debugf("(%d) err = %v", this.id, err)
-		}
+		this.ctx.Topics.Unsubscribe(t, this)
 		this.sess.RemoveTopic(string(t))
 	}
 
@@ -346,8 +318,6 @@ func (this *service) processUnsubscribe(msg *message.UnsubscribeMessage) error {
 }
 
 func (this *service) onPublish(msg *message.PublishMessage) error {
-	//glog.Debugf("(%d) onPublish %d", msg.PacketId())
-
 	if this.client {
 		return this.clientPublish(msg)
 	}
@@ -361,16 +331,12 @@ func (this *service) serverPublish(msg *message.PublishMessage) error {
 		return err
 	}
 
-	glog.Debugf("(%d) Publishing to %d clients", this.id, len(this.subs))
-
 	for i, s := range this.subs {
 		svc, ok := s.(*service)
 		if !ok {
-			//glog.Errorf("Invalid subscriber")
 			glog.Errorf("Disconnecting client: %v", err)
 			go svc.Disconnect()
 		} else {
-			//glog.Debugf("(%d) publishing to client %s with packetID %d qos %d", this.id, svc.cid, msg.PacketId(), qoss[i])
 			msg.SetQoS(this.qoss[i])
 			err := svc.Publish(msg, nil)
 			if err == ErrBufferNotReady {
@@ -389,8 +355,6 @@ func (this *service) clientPublish(msg *message.PublishMessage) error {
 		return err
 	}
 
-	//glog.Debugf("(%d) Found %d clients", this.id, len(subs))
-
 	for _, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(OnPublishFunc)
@@ -398,7 +362,6 @@ func (this *service) clientPublish(msg *message.PublishMessage) error {
 				glog.Errorf("Invalid onPublish Function")
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				//glog.Debugf("(%d) calling onpublish function", this.id)
 				fn(msg)
 			}
 		}

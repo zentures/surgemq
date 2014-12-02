@@ -138,9 +138,6 @@ func testPeekCommit(t *testing.T, buf *buffer) {
 		assert.NoError(t, true, err)
 
 		n -= l
-
-		//glog.Debugf("Commited %d bytes with %d remaining", l, n)
-
 		i += l
 	}
 }
@@ -171,7 +168,6 @@ func testRead(t *testing.T, buf *buffer) {
 	i := 0
 
 	for n > 0 {
-		//glog.Debugf("n = %d", n)
 		l, err := buf.Read(p[i:])
 
 		assert.NoError(t, true, err)
@@ -218,7 +214,6 @@ func benchmarkRead(b *testing.B, buf *buffer) {
 	i := 0
 
 	for n > 0 {
-		//glog.Debugf("n = %d", n)
 		l, _ := buf.Read(p[i:])
 
 		n -= int64(l)

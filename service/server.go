@@ -64,10 +64,12 @@ func handleConnection(ctx Context, conn io.Closer) (*server, error) {
 
 	tcpConn, ok := conn.(net.Conn)
 	if !ok {
+		glog.Errorf("Invalid TCP Connection: %v", ErrInvalidConnectionType)
 		return nil, ErrInvalidConnectionType
 	}
 
 	if !ctx.valid() {
+		glog.Errorf("Invalid context")
 		return nil, fmt.Errorf("Invalid context")
 	}
 
@@ -83,22 +85,25 @@ func handleConnection(ctx Context, conn io.Closer) (*server, error) {
 	tcpConn.SetReadDeadline(time.Now().Add(svc.ctx.ConnectTimeout))
 
 	if err := svc.initSendRecv(); err != nil {
+		glog.Errorf("(%d) Error initiating sender and receiver: %v", svc.id, err)
 		svc.Disconnect()
 		return nil, err
 	}
 
 	if err := svc.connectClient(); err != nil {
+		glog.Errorf("(%d) Error connecting client: %v", svc.id, err)
 		return nil, err
 	}
 
 	tcpConn.SetReadDeadline(time.Now().Add(svc.ctx.KeepAlive))
 
 	if err := svc.initProcessor(); err != nil {
+		glog.Errorf("(%d) Error initiating processor: %v", svc.id, err)
 		svc.Disconnect()
 		return nil, err
 	}
 
-	glog.Infof("server/HandleConnection: Connection established with client id %d", svc.id)
+	glog.Infof("(%d) server/handleConnection: Connection established with client %s.", svc.id, svc.cid)
 
 	return svc, nil
 }
