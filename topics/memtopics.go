@@ -19,7 +19,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
 )
 
@@ -42,7 +41,6 @@ func NewMemTopics() *MemTopics {
 
 func (this *MemTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte, error) {
 	if !message.ValidQos(qos) {
-		//glog.Errorf("Invalid QoS %d", qos)
 		return message.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
 	}
 
@@ -58,7 +56,6 @@ func (this *MemTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte,
 	}
 
 	if err := this.root.insert(topic, qos, sub); err != nil {
-		//glog.Errorf("%v", err)
 		return message.QosFailure, err
 	}
 
@@ -83,8 +80,6 @@ func (this *MemTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, 
 
 	*subs = (*subs)[0:0]
 	*qoss = (*qoss)[0:0]
-
-	glog.Debugf("len subs = %d", len(*subs))
 
 	return this.root.match(topic, qos, subs, qoss)
 }
@@ -315,8 +310,6 @@ func (this *node) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
 			*qoss = append(*qoss, qos)
 		}
 	}
-
-	glog.Debugf("Added %d subscribers", len(*subs))
 }
 
 func equal(k1, k2 interface{}) bool {
