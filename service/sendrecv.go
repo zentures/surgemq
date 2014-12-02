@@ -33,37 +33,33 @@ func (this *service) receiver() {
 
 	defer func() {
 		//if err != nil {
-		//	glog.Errorf("(%d) %v", this.id, err)
+		//	glog.Errorf("(%s) %v", this.cid, err)
 		//}
 		this.wg.Done()
 		this.close()
 
-		glog.Debugf("(%d) Stopping receiver", this.id)
+		glog.Debugf("(%s) Stopping receiver", this.cid)
 	}()
 
-	glog.Debugf("(%d) Starting receiver", this.id)
+	glog.Debugf("(%s) Starting receiver", this.cid)
 
 	switch conn := this.conn.(type) {
 	case net.Conn:
 		conn.SetReadDeadline(time.Now().Add(this.ctx.KeepAlive))
 
 		for {
-			//n, err = io.Copy(this.in, conn)
 			_, err = this.in.ReadFrom(conn)
 
-			//glog.Debugf("(%d) read %d bytes", this.id, n)
-
-			//if isTimeout(err) || err == io.EOF {
 			if err != nil {
 				return
 			}
 		}
 
 	case *websocket.Conn:
-		glog.Errorf("(%d) Websocket: %v", this.id, ErrInvalidConnectionType)
+		glog.Errorf("(%s) Websocket: %v", this.cid, ErrInvalidConnectionType)
 
 	default:
-		glog.Errorf("(%d) %v", this.id, ErrInvalidConnectionType)
+		glog.Errorf("(%s) %v", this.cid, ErrInvalidConnectionType)
 	}
 }
 
@@ -72,21 +68,19 @@ func (this *service) sender() {
 		this.wg.Done()
 		this.close()
 
-		glog.Debugf("(%d) Stopping sender", this.id)
+		glog.Debugf("(%s) Stopping sender", this.cid)
 	}()
 
-	glog.Debugf("(%d) Starting sender", this.id)
+	glog.Debugf("(%s) Starting sender", this.cid)
 
 	switch conn := this.conn.(type) {
 	case net.Conn:
 		for {
 			_, err := this.out.WriteTo(conn)
 
-			//glog.Debugf("(%d) wrote %d bytes", this.id, n)
-
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%d) error writing data: %v", this.id, err)
+					glog.Errorf("(%s) error writing data: %v", this.cid, err)
 				}
 				return
 			}
@@ -106,12 +100,6 @@ func (this *service) peekMessageSize() (message.MessageType, byte, int, error) {
 		err error
 		cnt int = 2
 	)
-
-	//defer func() {
-	//	if err != nil {
-	//		glog.Errorf("(%d) %v", this.id, err)
-	//	}
-	//}()
 
 	if this.in == nil {
 		err = ErrBufferNotReady
@@ -152,7 +140,6 @@ func (this *service) peekMessageSize() (message.MessageType, byte, int, error) {
 	total := int(remlen) + 1 + m
 
 	mtype := message.MessageType(b[0] >> 4)
-	//glog.Debugf("(%d) peeked %s, total = %d, remlen = %d", this.id, mtype.Name(), total, remlen)
 
 	qos := ((b[0] & 0x0f) >> 1) & 0x3
 
@@ -166,12 +153,6 @@ func (this *service) peekMessage(mtype message.MessageType, total int) (message.
 		i, n int
 		msg  message.Message
 	)
-
-	//defer func() {
-	//	if err != nil {
-	//		glog.Errorf("(%d) %v", this.id, err)
-	//	}
-	//}()
 
 	if this.in == nil {
 		err = ErrBufferNotReady
@@ -192,10 +173,6 @@ func (this *service) peekMessage(mtype message.MessageType, total int) (message.
 		}
 	}
 
-	//glog.Debugf("(%d) Peeked %d times for %s message of %d bytes", this.id, i, mtype.Name(), len(b))
-
-	//glog.Debugf("(%d) got %s, total = %d", this.id, mtype.Name(), len(b))
-
 	msg, err = mtype.New()
 	if err != nil {
 		return nil, 0, err
@@ -215,7 +192,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 
 	//defer func() {
 	//	if err != nil {
-	//		glog.Errorf("(%d) %v", this.id, err)
+	//		glog.Errorf("(%s) %v", this.cid, err)
 	//	}
 	//}()
 
@@ -258,41 +235,47 @@ func (this *service) writeMessage(msg message.Message) (int, error) {
 		wrap bool
 	)
 
-	//defer func() {
-	//	if err != nil {
-	//		glog.Errorf("(%d) %v", this.id, err)
-	//	}
-	//}()
-
 	if this.out == nil {
 		err = ErrBufferNotReady
 		return 0, err
 	}
+
+	// This is to serialize writes to the underlying buffer. Multiple goroutines could
+	// potentially get here because of calling Publish() or Subscribe() or other
+	// functions that will send messages. For example, if a message is received in
+	// another connetion, and the message needs to be published to this client, then
+	// the Publish() function is called, and at the same time, another client could
+	// do exactly the same thing.
+	//
+	// Not an ideal fix though. If possible we should remove mutex and be lockfree.
+	// Mainly because when there's a large number of goroutines that want to publish
+	// to this client, then they will all block. However, this will do for now.
+	//
+	// FIXME
+	this.wmu.Lock()
+	defer this.wmu.Unlock()
 
 	buf, wrap, err = this.out.WriteWait(l)
 	if err != nil {
 		return 0, err
 	}
 
-	glog.Debugf("(%d) Sending %s message of %d bytes", this.id, msg.Name(), l)
 	if wrap {
 		if len(this.outtmp) < l {
 			this.outtmp = make([]byte, l)
 		}
 
-		n, err = msg.Encode(this.outtmp)
+		n, err = msg.Encode(this.outtmp[0:])
 		if err != nil {
-			//glog.Debugf("(%d) error encoding message: %v", this.id, err)
 			return 0, err
 		}
 
 		m, err = this.out.Write(this.outtmp[0:n])
 		if err != nil {
-			//glog.Debugf("(%d) error writing message: %v", this.id, err)
 			return m, err
 		}
 	} else {
-		n, err = msg.Encode(buf)
+		n, err = msg.Encode(buf[0:])
 		if err != nil {
 			return 0, err
 		}
@@ -304,13 +287,4 @@ func (this *service) writeMessage(msg message.Message) (int, error) {
 	}
 
 	return m, nil
-}
-
-func (this *service) commitRead(buf *buffer, n int) (int, error) {
-	if buf == nil {
-		return 0, ErrBufferNotReady
-	}
-
-	//glog.Debugf("(%d) Commiting %d bytes", this.id, n)
-	return buf.ReadCommit(n)
 }

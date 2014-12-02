@@ -103,10 +103,11 @@ type service struct {
 
 	subs []interface{}
 	qoss []byte
+
+	wmu sync.Mutex
 }
 
 func (this *service) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
-	//glog.Debugf("(%d) sending %s qos = %d pktid = %d", this.id, msg.Name(), msg.QoS(), msg.PacketId())
 	if msg.QoS() == 0 {
 		_, err := this.writeMessage(msg)
 		if err != nil {
@@ -260,13 +261,13 @@ func (this *service) close() {
 
 	// Close quit channel, effectively telling all the goroutines it's time to quit
 	if this.done != nil {
-		glog.Debugf("(%d) closing this.done", this.id)
+		glog.Debugf("(%s) closing this.done", this.cid)
 		close(this.done)
 	}
 
 	// Close the network connection
 	if this.conn != nil {
-		glog.Debugf("(%d) closing this.conn", this.id)
+		glog.Debugf("(%s) closing this.conn", this.cid)
 		this.conn.Close()
 	}
 
@@ -282,12 +283,12 @@ func (this *service) close() {
 
 	// Close all the buffers and queues
 	if this.in != nil {
-		glog.Debugf("(%d) closing this.in", this.id)
+		glog.Debugf("(%s) closing this.in", this.cid)
 		this.in.Close()
 	}
 
 	if this.out != nil {
-		glog.Debugf("(%d) closing this.out", this.id)
+		glog.Debugf("(%s) closing this.out", this.cid)
 		this.out.Close()
 	}
 
@@ -312,21 +313,9 @@ func (this *service) initSendRecv() error {
 		return err
 	}
 
-	if this.client {
-		glog.Debugf("(%d) client input buffer %d", this.id, this.in.ID())
-	} else {
-		glog.Debugf("(%d) server input buffer %d", this.id, this.in.ID())
-	}
-
 	this.out, err = newBuffer(defaultBufferSize)
 	if err != nil {
 		return err
-	}
-
-	if this.client {
-		glog.Debugf("(%d) client output buffer %d", this.id, this.out.ID())
-	} else {
-		glog.Debugf("(%d) server output buffer %d", this.id, this.out.ID())
 	}
 
 	// Receiver is responsible for reading from the connection and putting data into
@@ -387,7 +376,7 @@ func (this *service) connectClient() error {
 		}
 		return err
 	}
-	defer this.commitRead(this.in, nreq)
+	defer this.in.ReadCommit(nreq)
 
 	req, ok := mreq.(*message.ConnectMessage)
 	if !ok {
@@ -418,6 +407,8 @@ func (this *service) connectClient() error {
 	this.inStat.increment(int64(nreq))
 	this.outStat.increment(int64(nresp))
 
+	glog.Debugf("(%d/%s) connected client, inbuf = %d, outbuf = %d", this.id, this.cid, this.in.ID(), this.out.ID())
+
 	return nil
 }
 
@@ -437,7 +428,7 @@ func (this *service) getServerSession(req *message.ConnectMessage, resp *message
 	// Check to see if the client supplied an ID, if not, generate one and set
 	// clean session.
 	if len(req.ClientId()) == 0 {
-		this.cid = fmt.Sprintf("internalclient--%d--", this.id)
+		this.cid = fmt.Sprintf("internalclient%d", this.id)
 		req.SetClientId([]byte(this.cid))
 		req.SetCleanSession(true)
 	} else {
@@ -474,8 +465,6 @@ func (this *service) getServerSession(req *message.ConnectMessage, resp *message
 		this.ctx.Topics.Subscribe([]byte(t), this.sess.Qos[i], this)
 	}
 
-	//glog.Debugf("(%d) client connected", this.id)
-
 	return nil
 }
 
@@ -505,7 +494,7 @@ func (this *service) connectToServer(msg *message.ConnectMessage) error {
 	if err != nil {
 		return err
 	}
-	defer this.commitRead(this.in, nresp)
+	defer this.in.ReadCommit(nresp)
 
 	resp, ok := mresp.(*message.ConnackMessage)
 	if !ok {
@@ -521,8 +510,6 @@ func (this *service) connectToServer(msg *message.ConnectMessage) error {
 	if err != nil {
 		return err
 	}
-
-	//glog.Debugf("(%d) client return code = %s", this.id, resp.ReturnCode().Desc())
 
 	this.inStat.increment(int64(nreq))
 	this.outStat.increment(int64(nresp))
@@ -541,6 +528,7 @@ func (this *service) getClientSession(req *message.ConnectMessage, resp *message
 		}
 	}
 
+	this.cid = string(req.ClientId())
 	this.sess.ClientId = string(this.cid)
 	this.sess.KeepAlive = time.Duration(req.KeepAlive())
 	this.sess.Username = string(req.Username())
@@ -554,7 +542,7 @@ func (this *service) getClientSession(req *message.ConnectMessage, resp *message
 }
 
 func (this *service) sendAndAckWait(msg message.Message, onComplete OnCompleteFunc) error {
-	// For any message that needs to go wait in the ackqueue, we should make a copy of that
+	// FIXME: For any message that needs to go wait in the ackqueue, we should make a copy of that
 	_, err := this.writeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("(%s) Error sending %s message: %v", this.cid, msg.Name(), err)
