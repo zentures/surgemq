@@ -531,65 +531,6 @@ func TestServiceSub2Pub2(t *testing.T) {
 	})
 }
 
-func BenchmarkServiceSub0Pub0(b *testing.B) {
-	runClientServerTests(b, func(svc *Client) {
-		done := make(chan struct{})
-		done2 := make(chan struct{})
-
-		count := 0
-		b.N = 1000000
-		now := time.Now()
-
-		sub := newSubscribeMessage(0)
-		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
-				close(done)
-			},
-			func(msg *message.PublishMessage) error {
-				assert.Equal(b, true, 1024, len(msg.Payload()))
-				count++
-
-				if count == 0 {
-					now = time.Now()
-				} else if count == b.N {
-					since := time.Since(now).Nanoseconds()
-					glog.Infof("Received %d messages in %d ns, %f ns/msg, %d msgs/sec", b.N, since, float64(since)/float64(b.N), int(float64(1000000000)/(float64(since)/float64(b.N))))
-					close(done2)
-				}
-
-				return nil
-
-			})
-
-		select {
-		case <-done:
-		case <-time.After(time.Millisecond * 100):
-			assert.Fail(b, true, "Timed out waiting for subscribe response")
-		}
-
-		msg := newPublishMessageLarge(0, 0)
-
-		go func() {
-			now := time.Now()
-			for i := 0; i < b.N; i++ {
-				svc.Publish(msg, nil)
-			}
-			since := time.Since(now).Nanoseconds()
-
-			glog.Infof("Sent %d messages in %d ns, %f ns/msg, %d msgs/sec", b.N, since, float64(since)/float64(b.N), int(float64(1000000000)/(float64(since)/float64(b.N))))
-		}()
-
-		select {
-		case <-done2:
-			assert.Equal(b, true, b.N, count)
-
-		case <-time.After(time.Second * 30):
-			assert.Fail(b, true, "Timed out waiting for publish messages")
-		}
-
-	})
-}
-
 func assertPublishMessage(t *testing.T, msg *message.PublishMessage, pktid uint16, qos byte) {
 	assert.Equal(t, true, "abc", string(msg.Payload()))
 	assert.Equal(t, true, qos, msg.QoS())
