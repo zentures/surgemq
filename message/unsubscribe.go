@@ -38,6 +38,16 @@ func NewUnsubscribeMessage() *UnsubscribeMessage {
 	return msg
 }
 
+func (this UnsubscribeMessage) String() string {
+	msgstr := fmt.Sprintf("%s", this.header)
+
+	for i, t := range this.topics {
+		msgstr = fmt.Sprintf("%s, Topic%d=%s", msgstr, i, string(t))
+	}
+
+	return msgstr
+}
+
 // Topics returns a list of topics sent by the Client.
 func (this *UnsubscribeMessage) Topics() [][]byte {
 	return this.topics

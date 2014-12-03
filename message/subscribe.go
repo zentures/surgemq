@@ -44,6 +44,16 @@ func NewSubscribeMessage() *SubscribeMessage {
 	return msg
 }
 
+func (this SubscribeMessage) String() string {
+	msgstr := fmt.Sprintf("%s", this.header)
+
+	for i, t := range this.topics {
+		msgstr = fmt.Sprintf("%s, Topic%d=%s (%d)", msgstr, i, string(t), this.qos[i])
+	}
+
+	return msgstr
+}
+
 // Topics returns a list of topics sent by the Client.
 func (this *SubscribeMessage) Topics() [][]byte {
 	return this.topics

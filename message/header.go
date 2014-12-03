@@ -35,7 +35,7 @@ type header struct {
 
 // String returns a string representation of the message.
 func (this header) String() string {
-	return fmt.Sprintf("Packet type: %s\nFlags: %08b\nRemaining Length: %d bytes\n", this.mtype.Name(), this.flags, this.remlen)
+	return fmt.Sprintf("Packet type=%s, Flags=%08b, Remaining Length=%d bytes", this.mtype.Name(), this.flags, this.remlen)
 }
 
 // Name returns a string representation of the message type. Examples include

@@ -17,14 +17,7 @@ package message
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 )
-
-var clientIdRegexp *regexp.Regexp
-
-func init() {
-	clientIdRegexp, _ = regexp.Compile("^[0-9a-zA-Z]*$")
-}
 
 const (
 	maxLPString          uint16 = 65535
@@ -332,16 +325,6 @@ func ValidTopic(topic []byte) bool {
 // QosAtLeastonce, and QosExactlyOnce.
 func ValidQos(qos byte) bool {
 	return qos == QosAtMostOnce || qos == QosAtLeastOnce || qos == QosExactlyOnce
-}
-
-// ValidClientId checks the client ID, which is a slice of bytes, to see if it's valid.
-// Client ID is valid if it meets the requirement from the MQTT spec:
-// 		The Server MUST allow ClientIds which are between 1 and 23 UTF-8 encoded bytes in length,
-//		and that contain only the characters
-//
-//		"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-func ValidClientId(cid []byte) bool {
-	return clientIdRegexp.Match(cid)
 }
 
 // ValidVersion checks to see if the version is valid. Current supported versions include 0x3 and 0x4.
