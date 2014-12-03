@@ -42,7 +42,7 @@ func NewSubackMessage() *SubackMessage {
 
 // String returns a string representation of the message.
 func (this SubackMessage) String() string {
-	return fmt.Sprintf("%s\nPacket ID: %d\nReturn Codes: %v\n", this.header, this.packetId, this.returnCodes)
+	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v", this.header, this.packetId, this.returnCodes)
 }
 
 // ReturnCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.

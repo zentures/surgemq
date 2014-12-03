@@ -72,8 +72,15 @@ func TestConnectMessageFields(t *testing.T) {
 
 	assert.Equal(t, false, "j0j0jfajf02j0asdjf", string(msg.ClientId()), "Error setting client ID.")
 
-	err = msg.SetClientId([]byte("this is no good"))
+	err = msg.SetClientId([]byte("this is good for v3"))
+	assert.NoError(t, false, err)
+
+	msg.SetVersion(0x4)
+
+	err = msg.SetClientId([]byte("this is no good for v4!"))
 	assert.Error(t, false, err)
+
+	msg.SetVersion(0x3)
 
 	msg.SetWillTopic([]byte("willtopic"))
 	assert.Equal(t, false, "willtopic", string(msg.WillTopic()), "Error setting will topic.")

@@ -40,7 +40,7 @@ func NewPublishMessage() *PublishMessage {
 }
 
 func (this PublishMessage) String() string {
-	return fmt.Sprintf("%v\nTopic: %s\nPacket ID: %d\nPayload: %s\n",
+	return fmt.Sprintf("%s, Topic=%s, Packet ID=%d, Payload=%s",
 		this.header, this.topic, this.packetId, string(this.payload))
 }
 

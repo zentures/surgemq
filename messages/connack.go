@@ -42,7 +42,7 @@ func NewConnackMessage() *ConnackMessage {
 
 // String returns a string representation of the CONNACK message
 func (this ConnackMessage) String() string {
-	return fmt.Sprintf("%v\nSession Present: %t\nReturn code: %v\n",
+	return fmt.Sprintf("%s, Session Present=%t, Return code=%s\n",
 		this.header, this.sessionPresent, this.returnCode)
 }
 

@@ -17,7 +17,14 @@ package message
 import (
 	"encoding/binary"
 	"fmt"
+	"regexp"
 )
+
+var clientIdRegexp *regexp.Regexp
+
+func init() {
+	clientIdRegexp, _ = regexp.Compile("^[0-9a-zA-Z ]*$")
+}
 
 // After a Network Connection is established by a Client to a Server, the first Packet
 // sent from the Client to the Server MUST be a CONNECT Packet [MQTT-3.1.0-1].
@@ -62,7 +69,7 @@ func NewConnectMessage() *ConnectMessage {
 
 // String returns a string representation of the CONNECT message
 func (this ConnectMessage) String() string {
-	return fmt.Sprintf("%v\nConnect Flags: %08b\nVersion: %d\nKeepAlive: %d\nClient ID: %s\nWill Topic: %s\nWill Message: %s\nUsername: %s\nPassword: %s\n",
+	return fmt.Sprintf("%s, Connect Flags=%08b, Version=%d, KeepAlive=%d, Client ID=%s, Will Topic=%s, Will Message=%s, Username=%s, Password=%s",
 		this.header,
 		this.connectFlags,
 		this.Version(),
@@ -216,7 +223,7 @@ func (this *ConnectMessage) ClientId() []byte {
 
 // SetClientId sets an ID that identifies the Client to the Server.
 func (this *ConnectMessage) SetClientId(v []byte) error {
-	if len(v) > 0 && !ValidClientId(v) {
+	if len(v) > 0 && !this.validClientId(v) {
 		return ErrIdentifierRejected
 	}
 
@@ -485,7 +492,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 	// The ClientId must contain only characters 0-9, a-z, and A-Z
 	// We also support ClientId longer than 23 encoded bytes
 	// We do not support ClientId outside of the above characters
-	if len(this.clientId) > 0 && !ValidClientId(this.clientId) {
+	if len(this.clientId) > 0 && !this.validClientId(this.clientId) {
 		return total, ErrIdentifierRejected
 	}
 
@@ -570,4 +577,22 @@ func (this *ConnectMessage) msglen() int {
 	}
 
 	return total
+}
+
+// validClientId checks the client ID, which is a slice of bytes, to see if it's valid.
+// Client ID is valid if it meets the requirement from the MQTT spec:
+// 		The Server MUST allow ClientIds which are between 1 and 23 UTF-8 encoded bytes in length,
+//		and that contain only the characters
+//
+//		"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+func (this *ConnectMessage) validClientId(cid []byte) bool {
+	if len(cid) > 23 {
+		return false
+	}
+
+	if this.Version() == 0x3 {
+		return true
+	}
+
+	return clientIdRegexp.Match(cid)
 }
