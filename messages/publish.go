@@ -40,8 +40,8 @@ func NewPublishMessage() *PublishMessage {
 }
 
 func (this PublishMessage) String() string {
-	return fmt.Sprintf("%s, Topic=%s, Packet ID=%d, Payload=%s",
-		this.header, this.topic, this.packetId, string(this.payload))
+	return fmt.Sprintf("%s, Topic=%s, Packet ID=%d, Payload=%v",
+		this.header, this.topic, this.packetId, this.payload)
 }
 
 // Dup returns the value specifying the duplicate delivery of a PUBLISH Control Packet.
