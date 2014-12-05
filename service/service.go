@@ -15,6 +15,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -23,8 +24,17 @@ import (
 	"time"
 
 	"github.com/dataence/glog"
+	"github.com/surge/surgemq/auth"
 	"github.com/surge/surgemq/message"
-	"github.com/surge/surgemq/sessions"
+	"github.com/surge/surgemq/session"
+	"github.com/surge/surgemq/topics"
+)
+
+var (
+	ErrInvalidConnectionType  error = errors.New("service: Invalid connection type")
+	ErrInvalidSubscriber      error = errors.New("service: Invalid subscriber")
+	ErrBufferNotReady         error = errors.New("service: buffer is not ready")
+	ErrBufferInsufficientData error = errors.New("service: buffer has insufficient data.")
 )
 
 type (
@@ -47,6 +57,17 @@ const (
 	defaultQueueSize = 16
 
 	defaultBufferSize = 1024 * 256
+
+	keyClientId    = "CLIENTID"
+	keyKeepAlive   = "KEEPALIVE"
+	keyUsername    = "USERNAME"
+	keyWillRetain  = "WILLRETAIN"
+	keyWillQos     = "WILLQOS"
+	keyWillTopic   = "WILLTOPIC"
+	keyWillMessage = "WILLMESSAGE"
+	keyVersion     = "VERSION"
+	keyTopics      = "TOPICS"
+	keyTopicQos    = "TOPICQOS"
 )
 
 var (
@@ -56,8 +77,6 @@ var (
 type service struct {
 	id uint64
 
-	ctx Context
-
 	// Is this a client or server. It's set by either Connect (client) or
 	// HandleConnection (server).
 	client bool
@@ -65,11 +84,16 @@ type service struct {
 	// client ID
 	cid string
 
+	// Network connection for this service
 	conn io.Closer
+
+	authMgr   *auth.Manager
+	sessMgr   *session.Manager
+	topicsMgr *topics.Manager
 
 	// sess is the session object for this MQTT session. It keeps track session variables
 	// such as ClientId, KeepAlive, Username, etc
-	sess *sessions.Session
+	sess session.Session
 
 	// Wait for the various goroutines to finish
 	wg sync.WaitGroup
@@ -104,7 +128,11 @@ type service struct {
 	subs []interface{}
 	qoss []byte
 
+	// writeMessage mutex - serializes writes to the outgoing buffer.
 	wmu sync.Mutex
+
+	// close mutex -
+	cmu sync.Mutex
 }
 
 func (this *service) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
@@ -178,8 +206,8 @@ func (this *service) Subscribe(msg *message.SubscribeMessage, onComplete OnCompl
 			if c == message.QosFailure {
 				err2 = fmt.Errorf("Failed to subscribe to '%s'\n%v", string(t), err2)
 			} else {
-				this.sess.AddTopic(string(t), c)
-				_, err := this.ctx.Topics.Subscribe(t, c, onPublish)
+				addTopic(this.sess, string(t), c)
+				_, err := this.topicsMgr.Subscribe(t, c, onPublish)
 				if err != nil {
 					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
 				}
@@ -228,12 +256,12 @@ func (this *service) Unsubscribe(msg *message.UnsubscribeMessage, onComplete OnC
 		for _, tb := range unsub.Topics() {
 			// Remove all subscribers, which basically it's just this client, since
 			// each client has it's own topic tree.
-			err := this.ctx.Topics.Unsubscribe(tb, nil)
+			err := this.topicsMgr.Unsubscribe(tb, nil)
 			if err != nil {
 				err2 = fmt.Errorf("%v\n%v", err2, err)
 			}
 
-			this.sess.RemoveTopic(string(tb))
+			removeTopic(this.sess, string(tb))
 		}
 
 		if onComplete != nil {
@@ -250,14 +278,24 @@ func (this *service) Ping(onComplete OnCompleteFunc) error {
 }
 
 func (this *service) Disconnect() {
+	//msg := message.NewDisconnectMessage()
 	this.close()
 }
 
+// FIXME: The order of closing here causes panic sometimes. For example, if receiver
+// calls this, and closes the buffers, somehow it causes buffer.go:476 to panid.
 func (this *service) close() {
 	doit := atomic.CompareAndSwapInt64(&this.closed, 0, 1)
 	if !doit {
 		return
 	}
+
+	defer func() {
+		// Let's recover from panic
+		if r := recover(); r != nil {
+			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
+		}
+	}()
 
 	// Close quit channel, effectively telling all the goroutines it's time to quit
 	if this.done != nil {
@@ -273,13 +311,22 @@ func (this *service) close() {
 
 	// Unsubscribe from all the topics for this client
 	if this.sess != nil {
-		for _, t := range this.sess.Topics {
-			this.ctx.Topics.Unsubscribe([]byte(t), this)
+		topics, _, err := getTopicsQoss(this.sess)
+		if err != nil {
+			glog.Errorf("(%s/%d): %v", this.cid, this.id, err)
+		} else {
+			for _, t := range topics {
+				this.topicsMgr.Unsubscribe([]byte(t), this)
+			}
 		}
 	}
 
+	topics.Unregister(this.cid)
+
 	// Remove the session from session store
-	this.ctx.Store.Del(this.cid)
+	if this.sessMgr != nil {
+		this.sessMgr.Del(this.cid)
+	}
 
 	// Close all the buffers and queues
 	if this.in != nil {
@@ -370,6 +417,7 @@ func (this *service) connectClient() error {
 	mreq, nreq, err := this.peekMessage(mtype, total)
 	if err != nil {
 		if cerr, ok := err.(message.ConnackCode); ok {
+			glog.Debugf("request  message: %s\nresponse message: %s\nerror           : %v", mreq, resp, err)
 			resp.SetReturnCode(cerr)
 			resp.SetSessionPresent(false)
 			this.writeMessage(resp)
@@ -383,8 +431,12 @@ func (this *service) connectClient() error {
 		return fmt.Errorf("Received invalid CONNECT message")
 	}
 
+	if err := this.getServerManagers(); err != nil {
+		glog.Errorf("%d) %v", this.id, err)
+	}
+
 	// Authenticate the user, if error, return error and exit
-	err = this.ctx.Auth.Authenticate(string(req.Username()), string(req.Password()))
+	err = this.authMgr.Authenticate(string(req.Username()), string(req.Password()))
 	if err != nil {
 		resp.SetReturnCode(message.ErrBadUsernameOrPassword)
 		resp.SetSessionPresent(false)
@@ -406,8 +458,6 @@ func (this *service) connectClient() error {
 
 	this.inStat.increment(int64(nreq))
 	this.outStat.increment(int64(nresp))
-
-	glog.Debugf("(%d/%s) connected client, inbuf = %d, outbuf = %d", this.id, this.cid, this.in.ID(), this.out.ID())
 
 	return nil
 }
@@ -438,48 +488,47 @@ func (this *service) getServerSession(req *message.ConnectMessage, resp *message
 	// If CleanSession is NOT set, check the session store for existing session.
 	// If found, return it.
 	if !req.CleanSession() {
-		if this.sess, err = this.ctx.Store.Get(this.cid); err == nil {
+		if this.sess, err = this.sessMgr.Get(this.cid); err == nil {
 			resp.SetSessionPresent(true)
 		}
 	}
 
 	// If CleanSession, or no existing session found, then create a new one
 	if this.sess == nil {
-		if this.sess, err = this.ctx.Store.New(this.cid); err != nil {
+		if this.sess, err = this.sessMgr.New(this.cid); err != nil {
 			return err
 		}
 
 		resp.SetSessionPresent(false)
 	}
 
-	this.sess.ClientId = string(this.cid)
-	this.sess.KeepAlive = time.Duration(req.KeepAlive())
-	this.sess.Username = string(req.Username())
-	this.sess.WillRetain = req.WillRetain()
-	this.sess.WillQos = req.WillQos()
-	this.sess.WillTopic = string(req.WillTopic())
-	this.sess.WillMessage = string(req.WillMessage())
-	this.sess.Version = req.Version()
+	this.sess.Set(keyClientId, this.cid)
+	this.sess.Set(keyKeepAlive, time.Duration(req.KeepAlive()))
+	this.sess.Set(keyUsername, string(req.Username()))
+	this.sess.Set(keyWillRetain, req.WillRetain())
+	this.sess.Set(keyWillQos, req.WillQos())
+	this.sess.Set(keyWillTopic, string(req.WillTopic()))
+	this.sess.Set(keyWillMessage, string(req.WillMessage()))
+	this.sess.Set(keyVersion, req.Version())
 
-	for i, t := range this.sess.Topics {
-		this.ctx.Topics.Subscribe([]byte(t), this.sess.Qos[i], this)
+	topics, qoss, err := getTopicsQoss(this.sess)
+	if err != nil {
+		return err
+	} else {
+
+		for i, t := range topics {
+			this.topicsMgr.Subscribe([]byte(t), qoss[i], this)
+		}
 	}
 
 	return nil
 }
 
 func (this *service) connectToServer(msg *message.ConnectMessage) error {
-	conn, ok := this.conn.(net.Conn)
-	if !ok {
-		return ErrInvalidConnectionType
-	}
-
 	nreq, err := this.writeMessage(msg)
 	if err != nil {
 		return err
 	}
-
-	conn.SetReadDeadline(time.Now().Add(this.ctx.ConnectTimeout))
 
 	mtype, _, total, err := this.peekMessageSize()
 	if err != nil {
@@ -506,15 +555,28 @@ func (this *service) connectToServer(msg *message.ConnectMessage) error {
 		return ret
 	}
 
+	this.sessMgr, err = session.NewManager(options.SessionProvider)
+	if err != nil {
+		glog.Errorf("(%d) Error retrieving session manager: %v", this.id, err)
+		return err
+	}
+
 	err = this.getClientSession(msg, resp)
 	if err != nil {
 		return err
 	}
 
+	p := topics.NewMemProvider()
+	topics.Register(this.cid, p)
+
+	this.topicsMgr, err = topics.NewManager(this.cid)
+	if err != nil {
+		glog.Errorf("(%d) Error retrieving topics manager: %v", this.id, err)
+		return err
+	}
+
 	this.inStat.increment(int64(nreq))
 	this.outStat.increment(int64(nresp))
-
-	conn.SetReadDeadline(time.Now().Add(this.ctx.KeepAlive))
 
 	return nil
 }
@@ -523,20 +585,20 @@ func (this *service) getClientSession(req *message.ConnectMessage, resp *message
 	var err error
 
 	if this.sess == nil {
-		if this.sess, err = this.ctx.Store.New(this.cid); err != nil {
+		if this.sess, err = this.sessMgr.New(this.cid); err != nil {
 			return err
 		}
 	}
 
 	this.cid = string(req.ClientId())
-	this.sess.ClientId = string(this.cid)
-	this.sess.KeepAlive = time.Duration(req.KeepAlive())
-	this.sess.Username = string(req.Username())
-	this.sess.WillRetain = req.WillRetain()
-	this.sess.WillQos = req.WillQos()
-	this.sess.WillTopic = string(req.WillTopic())
-	this.sess.WillMessage = string(req.WillMessage())
-	this.sess.Version = req.Version()
+	this.sess.Set(keyClientId, this.cid)
+	this.sess.Set(keyKeepAlive, time.Duration(req.KeepAlive()))
+	this.sess.Set(keyUsername, string(req.Username()))
+	this.sess.Set(keyWillRetain, req.WillRetain())
+	this.sess.Set(keyWillQos, req.WillQos())
+	this.sess.Set(keyWillTopic, string(req.WillTopic()))
+	this.sess.Set(keyWillMessage, string(req.WillMessage()))
+	this.sess.Set(keyVersion, req.Version())
 
 	return nil
 }
@@ -549,4 +611,141 @@ func (this *service) sendAndAckWait(msg message.Message, onComplete OnCompleteFu
 	}
 
 	return this.ack.AckWait(msg, onComplete)
+}
+
+func (this *service) getServerManagers() error {
+	var err error
+
+	this.authMgr, err = auth.NewManager(options.Authenticator)
+	if err != nil {
+		glog.Errorf("(%d) Error retrieving authentication manager: %v", this.id, err)
+		return err
+	}
+
+	this.sessMgr, err = session.NewManager(options.SessionProvider)
+	if err != nil {
+		glog.Errorf("(%d) Error retrieving session manager: %v", this.id, err)
+		return err
+	}
+
+	this.topicsMgr, err = topics.NewManager("mem")
+	if err != nil {
+		glog.Errorf("(%d) Error retrieving topics manager: %v", this.id, err)
+		return err
+	}
+
+	return nil
+}
+
+func addTopic(sess session.Session, topic string, qos byte) error {
+	topics, qoss, err := getTopicsQoss(sess)
+	if err != nil {
+		return err
+	}
+
+	found := false
+
+	// Update subscription if already exist
+	for i, t := range topics {
+		if topic == t {
+			qoss[i] = qos
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		// Otherwise add it
+		topics = append(topics, topic)
+		qoss = append(qoss, qos)
+	}
+
+	sess.Set(keyTopics, topics)
+	sess.Set(keyTopicQos, qoss)
+
+	return nil
+}
+
+func removeTopic(sess session.Session, topic string) error {
+	topics, qoss, err := getTopicsQoss(sess)
+	if err != nil {
+		return err
+	}
+
+	// Delete subscription if already exist
+	for i, t := range topics {
+		if topic == t {
+			topics = append(topics[:i], topics[i+1:]...)
+			qoss = append(qoss[:i], qoss[i+1:]...)
+			break
+		}
+	}
+
+	sess.Set(keyTopics, topics)
+	sess.Set(keyTopicQos, qoss)
+
+	return nil
+}
+
+func getTopicsQoss(sess session.Session) ([]string, []byte, error) {
+	var (
+		topics []string
+		qoss   []byte
+		ok     bool
+	)
+
+	ti, err := sess.Get(keyTopics)
+	if err != nil {
+		topics = make([]string, 0)
+	} else {
+		topics, ok = ti.([]string)
+		if !ok {
+			return nil, nil, fmt.Errorf("topics is not a string slice")
+		}
+	}
+
+	qi, err := sess.Get(keyTopicQos)
+	if err != nil {
+		qoss = make([]byte, 0)
+	} else {
+		qoss, ok = qi.([]byte)
+		if !ok {
+			return nil, nil, fmt.Errorf("QoS is not a byte slice")
+		}
+	}
+
+	if len(topics) != len(qoss) {
+		return nil, nil, fmt.Errorf("Number of topics (%d) != number of QoS (%d)", len(topics), len(qoss))
+	}
+
+	return topics, qoss, nil
+}
+
+func powerOfTwo64(n int64) bool {
+	return n != 0 && (n&(n-1)) == 0
+}
+
+func roundUpPowerOfTwo32(n int32) int32 {
+	n--
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	n++
+
+	return n
+}
+
+func roundUppowerOfTwo64(n int64) int64 {
+	n--
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	n |= n >> 32
+	n++
+
+	return n
 }

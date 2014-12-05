@@ -12,11 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sessions
+package session
 
-type Store interface {
-	New(string) (*Session, error)
-	Get(string) (*Session, error)
-	Del(string)
-	Len() int
+/*
+func TestMemStore(t *testing.T) {
+	st := NewMemStore()
+
+	for i := 0; i < 10; i++ {
+		st.New(fmt.Sprintf("%d", i))
+	}
+
+	assert.Equal(t, true, 10, st.Len(), "Incorrect length.")
+
+	for i := 0; i < 10; i++ {
+		sess, err := st.Get(fmt.Sprintf("%d", i))
+		assert.NoError(t, true, err, "Unable to Get() session #%d", i)
+
+		assert.Equal(t, true, fmt.Sprintf("%d", i), sess.ClientId, "Incorrect ID")
+	}
+
+	for i := 0; i < 5; i++ {
+		st.Del(fmt.Sprintf("%d", i))
+	}
+
+	assert.Equal(t, true, 5, st.Len(), "Incorrect length.")
 }
+*/

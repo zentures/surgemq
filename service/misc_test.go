@@ -23,9 +23,8 @@ import (
 	"testing"
 
 	"github.com/dataence/assert"
-	"github.com/surge/surgemq/auth"
 	"github.com/surge/surgemq/message"
-	"github.com/surge/surgemq/sessions"
+	"github.com/surge/surgemq/session"
 	"github.com/surge/surgemq/topics"
 )
 
@@ -41,11 +40,22 @@ func runClientServerTests(t testing.TB, f func(*Client)) {
 
 	// Start listener
 	wg.Add(1)
-	go startService(t, u, newTempContext(), &wg, ready1, ready2)
+	go startService(t, u, &wg, ready1, ready2)
 
 	<-ready1
 
-	svc := connectToServer(t, uri, true)
+	var svc *Client
+	if options.Authenticator == "mockFailure" {
+		svc = connectToServer(t, uri, false)
+	} else {
+		svc = connectToServer(t, uri, true)
+	}
+
+	if svc == nil {
+		return
+	}
+
+	defer topics.Unregister(svc.cid)
 
 	if f != nil {
 		f(svc)
@@ -58,12 +68,20 @@ func runClientServerTests(t testing.TB, f func(*Client)) {
 	wg.Wait()
 }
 
-func startService(t testing.TB, u *url.URL, ctx Context, wg *sync.WaitGroup, ready1, ready2 chan struct{}) {
+func startService(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 chan struct{}) {
 	defer wg.Done()
+
+	topics.Unregister("mem")
+	tp := topics.NewMemProvider()
+	topics.Register("mem", tp)
+
+	session.Unregister("mem")
+	sp := session.NewMemProvider()
+	session.Register("mem", sp)
 
 	conn := listenAndConnect(t, u, ready1)
 
-	svc, err := handleConnection(ctx, conn)
+	svc, err := handleConnection(conn)
 	defer svc.Disconnect()
 	assert.NoError(t, true, err)
 
@@ -86,7 +104,7 @@ func listenAndConnect(t testing.TB, u *url.URL, ready chan struct{}) net.Conn {
 func connectToServer(t testing.TB, uri string, success bool) *Client {
 	msg := newConnectMessage()
 
-	svc, err := Connect(newTempContext(), uri, msg)
+	svc, err := Connect(uri, msg)
 	if success {
 		assert.NoError(t, true, err)
 	} else {
@@ -184,16 +202,4 @@ func newConnectMessageBuffer() *bufio.Reader {
 	}
 
 	return bufio.NewReader(bytes.NewBuffer(msgBytes))
-}
-
-func newTempContext() Context {
-	return Context{
-		KeepAlive:      DefaultKeepAlive,
-		ConnectTimeout: DefaultConnectTimeout,
-		AckTimeout:     DefaultAckTimeout,
-		TimeoutRetries: DefaultTimeoutRetries,
-		Auth:           auth.MockSuccessAuthenticator,
-		Topics:         topics.NewMemTopics(),
-		Store:          sessions.NewMemStore(),
-	}
 }

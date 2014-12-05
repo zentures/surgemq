@@ -22,5 +22,5 @@ import (
 
 // Usage: go test -run=Publish0Topic1 -vv=2 -logtostderr [ -clients 2 ] [ -messages 100000 ] [ -msgsize 1024 ]
 func TestServer(t *testing.T) {
-	service.ListenAndServe(newTempContext(), "tcp://127.0.0.1:1883")
+	service.ListenAndServe("tcp://127.0.0.1:1883")
 }

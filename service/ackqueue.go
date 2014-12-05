@@ -60,8 +60,8 @@ type ackqueue struct {
 
 func newAckqueue(n int) *ackqueue {
 	m := int64(n)
-	if !PowerOfTwo64(m) {
-		m = RoundUpPowerOfTwo64(m)
+	if !powerOfTwo64(m) {
+		m = roundUppowerOfTwo64(m)
 	}
 
 	return &ackqueue{

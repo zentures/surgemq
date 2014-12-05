@@ -29,7 +29,7 @@ type Client struct {
 }
 
 // Connect is for MQTT clients to open a connection to a remote server
-func Connect(ctx Context, uri string, msg *message.ConnectMessage) (*Client, error) {
+func Connect(uri string, msg *message.ConnectMessage) (*Client, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -44,10 +44,6 @@ func Connect(ctx Context, uri string, msg *message.ConnectMessage) (*Client, err
 		return nil, err
 	}
 
-	if !ctx.valid() {
-		return nil, fmt.Errorf("Invalid context")
-	}
-
 	if msg == nil {
 		return nil, fmt.Errorf("msg is nil")
 	}
@@ -55,13 +51,12 @@ func Connect(ctx Context, uri string, msg *message.ConnectMessage) (*Client, err
 	svc := &Client{
 		service{
 			id:     atomic.AddUint64(&gsvcid, 1),
-			ctx:    ctx,
 			conn:   conn,
 			client: true,
 		},
 	}
 
-	conn.SetReadDeadline(time.Now().Add(svc.ctx.ConnectTimeout))
+	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(options.ConnectTimeout)))
 
 	svc.cid = string(msg.ClientId())
 
@@ -75,7 +70,7 @@ func Connect(ctx Context, uri string, msg *message.ConnectMessage) (*Client, err
 		return nil, err
 	}
 
-	conn.SetReadDeadline(time.Now().Add(svc.ctx.KeepAlive))
+	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(options.KeepAlive)))
 
 	if err := svc.initProcessor(); err != nil {
 		svc.Disconnect()

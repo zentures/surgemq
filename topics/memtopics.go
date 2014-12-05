@@ -15,6 +15,7 @@
 package topics
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -26,20 +27,30 @@ var (
 	MaxQosAllowed byte = message.QosExactlyOnce
 )
 
-type MemTopics struct {
+var (
+	ErrKeyNotAvailable error = errors.New("Session: not item found for key.")
+)
+
+var _ TopicsProvider = (*memTopics)(nil)
+
+type memTopics struct {
 	mu   sync.RWMutex
 	root *node
 }
 
-var _ Topics = (*MemTopics)(nil)
+func init() {
+	Register("mem", NewMemProvider())
+}
 
-func NewMemTopics() *MemTopics {
-	return &MemTopics{
+var _ TopicsProvider = (*memTopics)(nil)
+
+func NewMemProvider() *memTopics {
+	return &memTopics{
 		root: newNode(),
 	}
 }
 
-func (this *MemTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte, error) {
+func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte, error) {
 	if !message.ValidQos(qos) {
 		return message.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -62,7 +73,7 @@ func (this *MemTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte,
 	return qos, nil
 }
 
-func (this *MemTopics) Unsubscribe(topic []byte, sub interface{}) error {
+func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -70,7 +81,7 @@ func (this *MemTopics) Unsubscribe(topic []byte, sub interface{}) error {
 }
 
 // Returned values will be invalidated by the next Subscribers call
-func (this *MemTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
 	if !message.ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -313,12 +324,16 @@ func (this *node) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
 }
 
 func equal(k1, k2 interface{}) bool {
-	if k1 == k2 {
-		return true
-	}
-
 	if reflect.TypeOf(k1) != reflect.TypeOf(k2) {
 		return false
+	}
+
+	if reflect.ValueOf(k1).Kind() == reflect.Func {
+		return &k1 == &k2
+	}
+
+	if k1 == k2 {
+		return true
 	}
 
 	switch k1 := k1.(type) {

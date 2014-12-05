@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"time"
 
 	"github.com/dataence/glog"
 	"github.com/gorilla/websocket"
@@ -27,14 +26,7 @@ import (
 )
 
 func (this *service) receiver() {
-	var (
-		err error
-	)
-
 	defer func() {
-		//if err != nil {
-		//	glog.Errorf("(%s) %v", this.cid, err)
-		//}
 		this.wg.Done()
 		this.close()
 
@@ -45,12 +37,11 @@ func (this *service) receiver() {
 
 	switch conn := this.conn.(type) {
 	case net.Conn:
-		conn.SetReadDeadline(time.Now().Add(this.ctx.KeepAlive))
-
 		for {
-			_, err = this.in.ReadFrom(conn)
+			_, err := this.in.ReadFrom(conn)
 
 			if err != nil {
+				glog.Errorf("(%d/%s) error reading from connection: %v", this.id, this.cid, err)
 				return
 			}
 		}

@@ -14,61 +14,48 @@
 
 package service
 
-import (
-	"time"
-
-	"github.com/surge/surgemq/auth"
-	"github.com/surge/surgemq/sessions"
-	"github.com/surge/surgemq/topics"
-)
+import "flag"
 
 const (
-	DefaultKeepAlive      = 300000000000
-	DefaultConnectTimeout = 2000000000
-	DefaultAckTimeout     = 20000000000
-	DefaultTimeoutRetries = 3
-	DefaultSessionStore   = "mem"
-	DefaultAuthMethod     = "mock"
+	defaultKeepAlive       = 300
+	defaultConnectTimeout  = 2
+	defaultAckTimeout      = 20
+	defaultTimeoutRetries  = 3
+	defaultSessionProvider = "mem"
+	defaultAuthenticator   = "mockSuccess"
 )
 
-type Context struct {
+type Options struct {
 	// The number of seconds to keep the connection live if there's no data, default 5 mins
-	KeepAlive time.Duration
+	KeepAlive int
 
 	// The number of seconds to wait for the CONNECT message before disconnecting
-	ConnectTimeout time.Duration
+	ConnectTimeout int
 
 	// The number of seconds to wait for any ACK messages before failing
-	AckTimeout time.Duration
+	AckTimeout int
 
 	// The number of times to retry sending a packet if ACK is not received
 	TimeoutRetries int
 
 	// auth is the authenticator used to check username and password sent in the CONNECT message
-	Auth auth.Authenticator
+	Authenticator string
 
 	// sessions is the session store that keeps all the Session objects. This is the store to
 	// check if CleanSession is set to 0 in the CONNECT message
-	Store sessions.Store
-
-	// Topic subscriptions
-	Topics topics.Topics
+	SessionProvider string
 }
 
-func NewContext() Context {
-	return Context{
-		KeepAlive:      DefaultKeepAlive,
-		ConnectTimeout: DefaultConnectTimeout,
-		AckTimeout:     DefaultAckTimeout,
-		TimeoutRetries: DefaultTimeoutRetries,
-	}
-}
+var (
+	options Options
+)
 
-func (this Context) valid() bool {
-	if this.KeepAlive > 0 && this.ConnectTimeout > 0 && this.AckTimeout > 0 && this.TimeoutRetries > 0 &&
-		this.Auth != nil && this.Store != nil && this.Topics != nil {
-		return true
-	}
-
-	return false
+func init() {
+	flag.IntVar(&options.KeepAlive, "keepalive", defaultKeepAlive, "Keepalive (sec)")
+	flag.IntVar(&options.ConnectTimeout, "connect", defaultConnectTimeout, "Connect Timeout (sec)")
+	flag.IntVar(&options.AckTimeout, "ack", defaultAckTimeout, "Ack Timeout (sec)")
+	flag.IntVar(&options.TimeoutRetries, "retries", defaultTimeoutRetries, "Timeout Retries")
+	flag.StringVar(&options.Authenticator, "auth", defaultAuthenticator, "Authenticator Type")
+	flag.StringVar(&options.SessionProvider, "sessions", defaultSessionProvider, "Session Provide Type")
+	//flag.Parse()
 }

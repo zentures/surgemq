@@ -21,31 +21,37 @@ import (
 	"testing"
 
 	"github.com/dataence/assert"
-	"github.com/surge/surgemq/auth"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/service"
-	"github.com/surge/surgemq/sessions"
-	"github.com/surge/surgemq/topics"
 )
 
 var (
-	messages int    = 1000000
-	clients  int    = 1
-	msgsize  int    = 1024
-	topic    []byte = []byte("test")
-	qos      byte   = 0
-	nap      int    = 10
-	subdone  int64  = 0
+	messages  int    = 1000000
+	senders   int    = 1
+	receivers int    = 1
+	msgsize   int    = 1024
+	topic     []byte = []byte("test")
+	qos       byte   = 0
+	nap       int    = 10
+
+	subdone, rcvdone, sentdone int64
+
+	done, done2 chan struct{}
 
 	totalSent,
 	totalSentTime,
 	totalRcvd,
-	totalRcvdTime int64 = 0, 0, 0, 0
+	totalRcvdTime,
+	sentSince,
+	rcvdSince int64
+
+	statMu sync.Mutex
 )
 
 func init() {
 	flag.IntVar(&messages, "messages", messages, "number of messages to send")
-	flag.IntVar(&clients, "clients", clients, "number of clients to start")
+	flag.IntVar(&senders, "senders", senders, "number of senders to start (in FullMesh, only this is used)")
+	flag.IntVar(&receivers, "receivers", receivers, "number of receivers to start (in FullMesh, this is NOT used")
 	flag.IntVar(&msgsize, "msgsize", msgsize, "size of message payload to send")
 	flag.Parse()
 }
@@ -55,6 +61,8 @@ func runClientTest(t testing.TB, cid int, wg *sync.WaitGroup, f func(*service.Cl
 
 	uri := "tcp://127.0.0.1:1883"
 	svc := connectToServer(t, uri, cid)
+
+	assert.NotNil(t, true, svc)
 
 	if f != nil {
 		f(svc)
@@ -66,7 +74,7 @@ func runClientTest(t testing.TB, cid int, wg *sync.WaitGroup, f func(*service.Cl
 func connectToServer(t testing.TB, uri string, cid int) *service.Client {
 	msg := newConnectMessage(cid)
 
-	svc, err := service.Connect(newTempContext(), uri, msg)
+	svc, err := service.Connect(uri, msg)
 	assert.NoError(t, true, err)
 
 	return svc
@@ -102,16 +110,4 @@ func newConnectMessage(cid int) *message.ConnectMessage {
 	msg.SetPassword([]byte("verysecret"))
 
 	return msg
-}
-
-func newTempContext() service.Context {
-	return service.Context{
-		KeepAlive:      service.DefaultKeepAlive,
-		ConnectTimeout: service.DefaultConnectTimeout,
-		AckTimeout:     service.DefaultAckTimeout,
-		TimeoutRetries: service.DefaultTimeoutRetries,
-		Auth:           auth.MockSuccessAuthenticator,
-		Topics:         topics.NewMemTopics(),
-		Store:          sessions.NewMemStore(),
-	}
 }

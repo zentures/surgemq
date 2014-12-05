@@ -14,41 +14,24 @@
 
 package auth
 
-import "fmt"
+type mockAuthenticator bool
 
-type MockAuthenticator bool
-
-var _ Authenticator = (*MockAuthenticator)(nil)
+var _ Authenticator = (*mockAuthenticator)(nil)
 
 var (
-	MockSuccessAuthenticator MockAuthenticator = true
-	MockFailureAuthenticator MockAuthenticator = false
+	mockSuccessAuthenticator mockAuthenticator = true
+	mockFailureAuthenticator mockAuthenticator = false
 )
 
-func (this MockAuthenticator) Authenticate(user, pass string) error {
+func init() {
+	Register("mockSuccess", mockSuccessAuthenticator)
+	Register("mockFailure", mockFailureAuthenticator)
+}
+
+func (this mockAuthenticator) Authenticate(id string, cred interface{}) error {
 	if this == true {
 		return nil
 	}
 
-	return fmt.Errorf("Authentication failure")
+	return ErrAuthFailure
 }
-
-/*
-type MockAuthenticator struct {
-	succeed bool
-}
-
-
-var (
-	MockSuccessAuthenticator *MockAuthenticator = &MockAuthenticator{true}
-	MockFailureAuthenticator *MockAuthenticator = &MockAuthenticator{false}
-)
-
-func (this *MockAuthenticator) Authenticate(user, pass string) error {
-	if this.succeed {
-		return nil
-	}
-
-	return fmt.Errorf("Authentication failure")
-}
-*/

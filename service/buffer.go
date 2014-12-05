@@ -84,8 +84,8 @@ func newBuffer(size int64) (*buffer, error) {
 		size = defaultBufferSize
 	}
 
-	if !PowerOfTwo64(size) {
-		return nil, fmt.Errorf("Size must be power of two. Try %d.", RoundUpPowerOfTwo64(size))
+	if !powerOfTwo64(size) {
+		return nil, fmt.Errorf("Size must be power of two. Try %d.", roundUppowerOfTwo64(size))
 	}
 
 	if size < 2*defaultReadBlockSize {

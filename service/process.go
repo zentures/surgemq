@@ -17,6 +17,7 @@ package service
 import (
 	"fmt"
 	"io"
+	"reflect"
 
 	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
@@ -82,10 +83,12 @@ func (this *service) processor() {
 			return
 		}
 
+		//glog.Debugf("(%d/%s) received %v", this.id, this.cid, msg)
+
 		// 5. Process the read message
 		err = this.processIncoming(msg)
 		if err != nil {
-			glog.Errorf("(%d) Error processing %s: %v", msg.Name(), err)
+			glog.Errorf("(%d/%s) Error processing %s: %v", this.id, this.cid, msg.Name(), err)
 		}
 
 		// 6. If this was a peek, then we should commit the bytes in the buffer so we
@@ -285,11 +288,11 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 	qos := msg.Qos()
 
 	for i, t := range topics {
-		rqos, err := this.ctx.Topics.Subscribe(t, qos[i], this)
+		rqos, err := this.topicsMgr.Subscribe(t, qos[i], this)
 		if err != nil {
 			return err
 		}
-		this.sess.AddTopic(string(t), qos[i])
+		addTopic(this.sess, string(t), qos[i])
 
 		retcodes = append(retcodes, rqos)
 	}
@@ -306,8 +309,8 @@ func (this *service) processUnsubscribe(msg *message.UnsubscribeMessage) error {
 	topics := msg.Topics()
 
 	for _, t := range topics {
-		this.ctx.Topics.Unsubscribe(t, this)
-		this.sess.RemoveTopic(string(t))
+		this.topicsMgr.Unsubscribe(t, this)
+		removeTopic(this.sess, string(t))
 	}
 
 	resp := message.NewUnsubackMessage()
@@ -326,7 +329,7 @@ func (this *service) onPublish(msg *message.PublishMessage) error {
 }
 
 func (this *service) serverPublish(msg *message.PublishMessage) error {
-	err := this.ctx.Topics.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
 	if err != nil {
 		return err
 	}
@@ -334,14 +337,18 @@ func (this *service) serverPublish(msg *message.PublishMessage) error {
 	for i, s := range this.subs {
 		svc, ok := s.(*service)
 		if !ok {
-			glog.Errorf("Disconnecting client: %v", err)
-			go svc.Disconnect()
+			glog.Errorf("Disconnecting client: cannot type assert svc (%s) to *service", reflect.TypeOf(svc).Name())
+			this.topicsMgr.Unsubscribe(msg.Topic(), svc)
+			svc.Disconnect()
 		} else {
+			//glog.Debugf("(%d/%s) Publishing to %d/%d %s: %v", this.id, this.cid, i+1, len(this.subs), svc.cid, msg)
+			msg.SetPacketId(0)
 			msg.SetQoS(this.qoss[i])
 			err := svc.Publish(msg, nil)
 			if err == ErrBufferNotReady {
-				glog.Errorf("Disconnecting client: %v", err)
-				go svc.Disconnect()
+				glog.Errorf("Disconnecting client: cannot type assert svc to *service: %s", reflect.TypeOf(svc).Name())
+				this.topicsMgr.Unsubscribe(msg.Topic(), svc)
+				svc.Disconnect()
 			}
 		}
 	}
@@ -350,7 +357,7 @@ func (this *service) serverPublish(msg *message.PublishMessage) error {
 }
 
 func (this *service) clientPublish(msg *message.PublishMessage) error {
-	err := this.ctx.Topics.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
 	if err != nil {
 		return err
 	}

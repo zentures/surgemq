@@ -29,7 +29,7 @@ type server struct {
 	service
 }
 
-func ListenAndServe(ctx Context, uri string) error {
+func ListenAndServe(uri string) error {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return err
@@ -50,14 +50,14 @@ func ListenAndServe(ctx Context, uri string) error {
 			return err
 		}
 
-		go handleConnection(ctx, conn)
+		go handleConnection(conn)
 	}
 
 	return nil
 }
 
 // HandleConnection is for the broker to handle an incoming connection from a client
-func handleConnection(ctx Context, conn io.Closer) (*server, error) {
+func handleConnection(conn io.Closer) (*server, error) {
 	if conn == nil {
 		return nil, fmt.Errorf("Connection is nil")
 	}
@@ -68,21 +68,15 @@ func handleConnection(ctx Context, conn io.Closer) (*server, error) {
 		return nil, ErrInvalidConnectionType
 	}
 
-	if !ctx.valid() {
-		glog.Errorf("Invalid context")
-		return nil, fmt.Errorf("Invalid context")
-	}
-
 	svc := &server{
 		service{
 			id:     atomic.AddUint64(&gsvcid, 1),
-			ctx:    ctx,
 			conn:   conn,
 			client: false,
 		},
 	}
 
-	tcpConn.SetReadDeadline(time.Now().Add(svc.ctx.ConnectTimeout))
+	tcpConn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(options.ConnectTimeout)))
 
 	if err := svc.initSendRecv(); err != nil {
 		glog.Errorf("(%d) Error initiating sender and receiver: %v", svc.id, err)
@@ -95,7 +89,7 @@ func handleConnection(ctx Context, conn io.Closer) (*server, error) {
 		return nil, err
 	}
 
-	tcpConn.SetReadDeadline(time.Now().Add(svc.ctx.KeepAlive))
+	tcpConn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(options.KeepAlive)))
 
 	if err := svc.initProcessor(); err != nil {
 		glog.Errorf("(%d) Error initiating processor: %v", svc.id, err)

@@ -22,6 +22,11 @@
 // - $ is a special character that says the topic is a system level topic
 package topics
 
+import (
+	"errors"
+	"fmt"
+)
+
 const (
 	// Multi-level wildcard
 	MWC = "#"
@@ -39,8 +44,56 @@ const (
 	_WC = "#+"
 )
 
-type Topics interface {
+var (
+	ErrAuthFailure          = errors.New("auth: Authentication failure")
+	ErrAuthProviderNotFound = errors.New("auth: Authentication provider not found")
+
+	providers = make(map[string]TopicsProvider)
+)
+
+type TopicsProvider interface {
 	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
 	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
+}
+
+func Register(name string, provider TopicsProvider) {
+	if provider == nil {
+		panic("topics: Register provide is nil")
+	}
+
+	if _, dup := providers[name]; dup {
+		panic("topics: Register called twice for provider " + name)
+	}
+
+	providers[name] = provider
+}
+
+func Unregister(name string) {
+	delete(providers, name)
+}
+
+type Manager struct {
+	p TopicsProvider
+}
+
+func NewManager(providerName string) (*Manager, error) {
+	p, ok := providers[providerName]
+	if !ok {
+		return nil, fmt.Errorf("session: unknown provider %q", providerName)
+	}
+
+	return &Manager{p: p}, nil
+}
+
+func (this *Manager) Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error) {
+	return this.p.Subscribe(topic, qos, subscriber)
+}
+
+func (this *Manager) Unsubscribe(topic []byte, subscriber interface{}) error {
+	return this.p.Unsubscribe(topic, subscriber)
+}
+
+func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+	return this.p.Subscribers(topic, qos, subs, qoss)
 }

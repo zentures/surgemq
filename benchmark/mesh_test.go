@@ -26,32 +26,41 @@ import (
 	"github.com/surge/surgemq/service"
 )
 
-// Usage: go test -run=Publish0Topic1
-func Test_Publish0Topic1(t *testing.T) {
+// Usage: go test -run=Mesh
+func TestMesh(t *testing.T) {
 	var wg sync.WaitGroup
 
 	totalSent = 0
 	totalRcvd = 0
 	totalSentTime = 0
 	totalRcvdTime = 0
+	sentSince = 0
+	rcvdSince = 0
 
-	done := make(chan struct{})
+	subdone = 0
+	rcvdone = 0
 
-	for i := 1; i < clients+1; i++ {
+	done = make(chan struct{})
+	done2 = make(chan struct{})
+
+	for i := 1; i < senders+1; i++ {
 		time.Sleep(time.Millisecond * 20)
 		wg.Add(1)
-		go runPublish0PerformanceTest(t, messages, i, &wg, &subdone, done)
+		go startMeshClient(t, i, &wg)
 	}
 
 	wg.Wait()
 
-	glog.Infof("Total Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", totalSent, totalSentTime, int(float64(totalSentTime)/float64(totalSent)), int(float64(totalSent)/(float64(totalSentTime)/float64(time.Second))))
-	glog.Infof("Total Received %d messages in %d ns, %d ns/msg, %d msgs/sec", totalRcvd, totalRcvdTime, int(float64(totalRcvdTime)/float64(totalRcvd)), int(float64(totalRcvd)/(float64(totalRcvdTime)/float64(time.Second))))
+	glog.Infof("Total Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", totalSent, sentSince, int(float64(sentSince)/float64(totalSent)), int(float64(totalSent)/(float64(sentSince)/float64(time.Second))))
+	glog.Infof("Total Received %d messages in %d ns, %d ns/msg, %d msgs/sec", totalRcvd, rcvdSince, int(float64(rcvdSince)/float64(totalRcvd)), int(float64(totalRcvd)/(float64(rcvdSince)/float64(time.Second))))
 }
 
-func runPublish0PerformanceTest(t testing.TB, cnt int, cid int, wg *sync.WaitGroup, subdone *int64, done chan struct{}) {
+func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 	runClientTest(t, cid, wg, func(svc *service.Client) {
 		done2 := make(chan struct{})
+
+		cnt := messages
+		expected := senders * cnt
 
 		received := 0
 		sent := 0
@@ -62,8 +71,8 @@ func runPublish0PerformanceTest(t testing.TB, cnt int, cid int, wg *sync.WaitGro
 		sub := newSubscribeMessage("test", 0)
 		svc.Subscribe(sub,
 			func(msg, ack message.Message, err error) {
-				subs := atomic.AddInt64(subdone, 1)
-				if subs == int64(clients) {
+				subs := atomic.AddInt64(&subdone, 1)
+				if subs == int64(senders) {
 					close(done)
 				}
 			},
@@ -73,9 +82,10 @@ func runPublish0PerformanceTest(t testing.TB, cnt int, cid int, wg *sync.WaitGro
 				}
 
 				received++
+				//glog.Debugf("(surgemq%d) messages received=%d", cid, received)
 				since = time.Since(now).Nanoseconds()
 
-				if received == clients*cnt {
+				if received == expected {
 					close(done2)
 				}
 
@@ -84,7 +94,7 @@ func runPublish0PerformanceTest(t testing.TB, cnt int, cid int, wg *sync.WaitGro
 
 		select {
 		case <-done:
-		case <-time.After(time.Second * time.Duration(clients)):
+		case <-time.After(time.Second * time.Duration(senders)):
 			glog.Infof("(surgemq%d) Timed out waiting for subscribe response", cid)
 			return
 		}
@@ -110,20 +120,30 @@ func runPublish0PerformanceTest(t testing.TB, cnt int, cid int, wg *sync.WaitGro
 
 			since := time.Since(now).Nanoseconds()
 
-			atomic.AddInt64(&totalSent, int64(sent))
-			atomic.AddInt64(&totalSentTime, int64(since))
+			statMu.Lock()
+			totalSent += int64(sent)
+			totalSentTime += int64(since)
+			if since > sentSince {
+				sentSince = since
+			}
+			statMu.Unlock()
 
 			glog.Infof("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
 		}()
 
 		select {
 		case <-done2:
-		case <-time.Tick(time.Second * time.Duration(nap*clients)):
+		case <-time.Tick(time.Second * time.Duration(nap*senders)):
 			glog.Errorf("Timed out waiting for messages to be received.")
 		}
 
-		atomic.AddInt64(&totalRcvd, int64(received))
-		atomic.AddInt64(&totalRcvdTime, int64(since))
+		statMu.Lock()
+		totalRcvd += int64(received)
+		totalRcvdTime += int64(since)
+		if since > rcvdSince {
+			rcvdSince = since
+		}
+		statMu.Unlock()
 
 		glog.Infof("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
 	})

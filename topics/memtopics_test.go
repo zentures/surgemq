@@ -388,32 +388,33 @@ func TestNodeMatch9(t *testing.T) {
 }
 
 func TestMemTopics(t *testing.T) {
-	topics := NewMemTopics()
+	mgr, err := NewManager("mem")
+
 	MaxQosAllowed = 1
-	qos, err := topics.Subscribe([]byte("sports/tennis/+/stats"), 2, "sub1")
+	qos, err := mgr.Subscribe([]byte("sports/tennis/+/stats"), 2, "sub1")
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, qos)
 
-	err = topics.Unsubscribe([]byte("sports/tennis"), "sub1")
+	err = mgr.Unsubscribe([]byte("sports/tennis"), "sub1")
 
 	assert.Error(t, true, err)
 
 	subs := make([]interface{}, 5)
 	qoss := make([]byte, 5)
 
-	err = topics.Subscribers([]byte("sports/tennis/anzel/stats"), 2, &subs, &qoss)
+	err = mgr.Subscribers([]byte("sports/tennis/anzel/stats"), 2, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 0, len(subs))
 
-	err = topics.Subscribers([]byte("sports/tennis/anzel/stats"), 1, &subs, &qoss)
+	err = mgr.Subscribers([]byte("sports/tennis/anzel/stats"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 	assert.Equal(t, true, 1, qoss[0])
 
-	err = topics.Unsubscribe([]byte("sports/tennis/+/stats"), "sub1")
+	err = mgr.Unsubscribe([]byte("sports/tennis/+/stats"), "sub1")
 
 	assert.NoError(t, true, err)
 }

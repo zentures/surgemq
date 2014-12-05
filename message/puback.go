@@ -34,6 +34,10 @@ func NewPubackMessage() *PubackMessage {
 	return msg
 }
 
+func (this PubackMessage) String() string {
+	return fmt.Sprintf("%s, Packet ID=%d", this.header, this.packetId)
+}
+
 func (this *PubackMessage) Len() int {
 	ml := this.msglen()
 

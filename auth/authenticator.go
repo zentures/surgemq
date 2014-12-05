@@ -14,6 +14,51 @@
 
 package auth
 
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	ErrAuthFailure          = errors.New("auth: Authentication failure")
+	ErrAuthProviderNotFound = errors.New("auth: Authentication provider not found")
+
+	providers = make(map[string]Authenticator)
+)
+
 type Authenticator interface {
-	Authenticate(string, string) error
+	Authenticate(id string, cred interface{}) error
+}
+
+func Register(name string, provider Authenticator) {
+	if provider == nil {
+		panic("auth: Register provide is nil")
+	}
+
+	if _, dup := providers[name]; dup {
+		panic("auth: Register called twice for provider " + name)
+	}
+
+	providers[name] = provider
+}
+
+func Unregister(name string) {
+	delete(providers, name)
+}
+
+type Manager struct {
+	p Authenticator
+}
+
+func NewManager(providerName string) (*Manager, error) {
+	p, ok := providers[providerName]
+	if !ok {
+		return nil, fmt.Errorf("session: unknown provider %q", providerName)
+	}
+
+	return &Manager{p: p}, nil
+}
+
+func (this *Manager) Authenticate(id string, cred interface{}) error {
+	return this.p.Authenticate(id, cred)
 }
