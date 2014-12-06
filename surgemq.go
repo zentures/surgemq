@@ -15,22 +15,15 @@
 package main
 
 import (
-	"github.com/surge/surgemq/auth"
+	"flag"
+
 	"github.com/surge/surgemq/service"
-	"github.com/surge/surgemq/sessions"
-	"github.com/surge/surgemq/topics"
 )
 
-func main() {
-	ctx := service.Context{
-		KeepAlive:      service.DefaultKeepAlive,
-		ConnectTimeout: service.DefaultConnectTimeout,
-		AckTimeout:     service.DefaultAckTimeout,
-		TimeoutRetries: service.DefaultTimeoutRetries,
-		Auth:           auth.MockSuccessAuthenticator,
-		Topics:         topics.NewMemTopics(),
-		Store:          sessions.NewMemStore(),
-	}
+func init() {
+	flag.Parse()
+}
 
-	service.ListenAndServe(ctx, "tcp://127.0.0.1:1883")
+func main() {
+	service.ListenAndServe("tcp://127.0.0.1:1883")
 }

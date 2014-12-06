@@ -57,5 +57,4 @@ func init() {
 	flag.IntVar(&options.TimeoutRetries, "retries", defaultTimeoutRetries, "Timeout Retries")
 	flag.StringVar(&options.Authenticator, "auth", defaultAuthenticator, "Authenticator Type")
 	flag.StringVar(&options.SessionProvider, "sessions", defaultSessionProvider, "Session Provide Type")
-	//flag.Parse()
 }
