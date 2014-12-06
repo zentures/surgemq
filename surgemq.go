@@ -17,7 +17,7 @@ package main
 import (
 	"github.com/surge/surgemq/auth"
 	"github.com/surge/surgemq/service"
-	"github.com/surge/surgemq/sessions"
+	"github.com/surge/surgemq/session"
 	"github.com/surge/surgemq/topics"
 )
 
@@ -29,7 +29,7 @@ func main() {
 		TimeoutRetries: service.DefaultTimeoutRetries,
 		Auth:           auth.MockSuccessAuthenticator,
 		Topics:         topics.NewMemTopics(),
-		Store:          sessions.NewMemStore(),
+		Store:          session.NewMemStore(),
 	}
 
 	service.ListenAndServe(ctx, "tcp://127.0.0.1:1883")
