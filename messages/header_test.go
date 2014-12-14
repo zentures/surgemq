@@ -76,8 +76,9 @@ func TestMessageHeaderDecode3(t *testing.T) {
 func TestMessageHeaderDecode4(t *testing.T) {
 	buf := []byte{0x62, 0xff, 0xff, 0xff, 0x7f}
 	header := &header{
-		mtype: 6,
-		flags: 2,
+		mtypeflags: []byte{6<<4 | 2},
+		//mtype:      6,
+		//flags:      2,
 	}
 
 	n, err := header.decode(buf)
@@ -90,8 +91,9 @@ func TestMessageHeaderDecode4(t *testing.T) {
 func TestMessageHeaderDecode5(t *testing.T) {
 	buf := []byte{0x62, 0xff, 0x7f}
 	header := &header{
-		mtype: 6,
-		flags: 2,
+		mtypeflags: []byte{6<<4 | 2},
+		//mtype:      6,
+		//flags:      2,
 	}
 
 	n, err := header.decode(buf)
@@ -154,9 +156,11 @@ func TestMessageHeaderEncode3(t *testing.T) {
 }
 
 func TestMessageHeaderEncode4(t *testing.T) {
-	header := &header{}
-
-	header.mtype = RESERVED2
+	header := &header{
+		mtypeflags: []byte{byte(RESERVED2) << 4},
+		//mtype:      6,
+		//flags:      2,
+	}
 
 	buf := make([]byte, 5)
 	_, err := header.encode(buf)

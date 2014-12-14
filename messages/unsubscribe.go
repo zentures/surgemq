@@ -16,7 +16,6 @@ package message
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"sync/atomic"
 )
@@ -60,6 +59,7 @@ func (this *UnsubscribeMessage) AddTopic(topic []byte) {
 	}
 
 	this.topics = append(this.topics, topic)
+	this.dirty = true
 }
 
 // RemoveTopic removes a single topic from the list of existing ones in the message.
@@ -79,6 +79,8 @@ func (this *UnsubscribeMessage) RemoveTopic(topic []byte) {
 	if found {
 		this.topics = append(this.topics[:i], this.topics[i+1:]...)
 	}
+
+	this.dirty = true
 }
 
 // TopicExists checks to see if a topic exists in the list.
@@ -93,6 +95,10 @@ func (this *UnsubscribeMessage) TopicExists(topic []byte) bool {
 }
 
 func (this *UnsubscribeMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -114,7 +120,8 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 
-	this.packetId = binary.BigEndian.Uint16(src[total:])
+	//this.packetId = binary.BigEndian.Uint16(src[total:])
+	this.packetId = src[total : total+2]
 	total += 2
 
 	remlen := int(this.remlen) - (total - hn)
@@ -133,6 +140,8 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 		return 0, fmt.Errorf("unsubscribe/Decode: Empty topic list")
 	}
 
+	this.dirty = false
+
 	return total, nil
 }
 
@@ -142,6 +151,14 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 // should be considered invalid.
 // Any changes to the message after Encode() is called will invalidate the io.Reader.
 func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("unsubscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	hl := this.header.msglen()
 	ml := this.msglen()
 
@@ -161,12 +178,14 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 		return total, err
 	}
 
-	if this.packetId == 0 {
-		this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if this.PacketId() == 0 {
+		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 	}
 
-	binary.BigEndian.PutUint16(dst[total:], this.packetId)
-	total += 2
+	n = copy(dst[total:], this.packetId)
+	//binary.BigEndian.PutUint16(dst[total:], this.packetId)
+	total += n
 
 	for _, t := range this.topics {
 		n, err := writeLPBytes(dst[total:], t)

@@ -14,10 +14,7 @@
 
 package message
 
-import (
-	"encoding/binary"
-	"fmt"
-)
+import "fmt"
 
 // A PUBACK Packet is the response to a PUBLISH Packet with QoS level 1.
 type PubackMessage struct {
@@ -39,6 +36,10 @@ func (this PubackMessage) String() string {
 }
 
 func (this *PubackMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -57,13 +58,24 @@ func (this *PubackMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 
-	this.packetId = binary.BigEndian.Uint16(src[total:])
+	//this.packetId = binary.BigEndian.Uint16(src[total:])
+	this.packetId = src[total : total+2]
 	total += 2
+
+	this.dirty = false
 
 	return total, nil
 }
 
 func (this *PubackMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("puback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	hl := this.header.msglen()
 	ml := this.msglen()
 
@@ -83,7 +95,9 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 		return total, err
 	}
 
-	binary.BigEndian.PutUint16(dst[total:], this.packetId)
+	if copy(dst[total:total+2], this.packetId) != 2 {
+		dst[total], dst[total+1] = 0, 0
+	}
 	total += 2
 
 	return total, nil

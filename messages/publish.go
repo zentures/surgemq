@@ -15,7 +15,6 @@
 package message
 
 import (
-	"encoding/binary"
 	"fmt"
 	"sync/atomic"
 )
@@ -40,8 +39,8 @@ func NewPublishMessage() *PublishMessage {
 }
 
 func (this PublishMessage) String() string {
-	return fmt.Sprintf("%s, Topic=%s, Packet ID=%d, Payload=%v",
-		this.header, this.topic, this.packetId, this.payload)
+	return fmt.Sprintf("%s, Topic=%s, Packet ID=%d, QoS=%d, Payload=%v",
+		this.header, this.topic, this.packetId, this.QoS(), this.payload)
 }
 
 // Dup returns the value specifying the duplicate delivery of a PUBLISH Control Packet.
@@ -50,15 +49,15 @@ func (this PublishMessage) String() string {
 // set to 1, it indicates that this might be re-delivery of an earlier attempt to send
 // the Packet.
 func (this *PublishMessage) Dup() bool {
-	return ((this.flags >> 3) & 0x1) == 1
+	return ((this.Flags() >> 3) & 0x1) == 1
 }
 
 // SetDup sets the value specifying the duplicate delivery of a PUBLISH Control Packet.
 func (this *PublishMessage) SetDup(v bool) {
 	if v {
-		this.flags |= 0x8 // 00001000
+		this.mtypeflags[0] |= 0x8 // 00001000
 	} else {
-		this.flags &= 247 // 11110111
+		this.mtypeflags[0] &= 247 // 11110111
 	}
 }
 
@@ -67,22 +66,22 @@ func (this *PublishMessage) SetDup(v bool) {
 // Server, the Server MUST store the Application Message and its QoS, so that it can be
 // delivered to future subscribers whose subscriptions match its topic name.
 func (this *PublishMessage) Retain() bool {
-	return (this.flags & 0x1) == 1
+	return (this.Flags() & 0x1) == 1
 }
 
 // SetRetain sets the value of the RETAIN flag.
 func (this *PublishMessage) SetRetain(v bool) {
 	if v {
-		this.flags |= 0x1 // 00000001
+		this.mtypeflags[0] |= 0x1 // 00000001
 	} else {
-		this.flags &= 254 // 11111110
+		this.mtypeflags[0] &= 254 // 11111110
 	}
 }
 
 // QoS returns the field that indicates the level of assurance for delivery of an
 // Application Message. The values are QosAtMostOnce, QosAtLeastOnce and QosExactlyOnce.
 func (this *PublishMessage) QoS() byte {
-	return (this.flags >> 1) & 0x3
+	return (this.Flags() >> 1) & 0x3
 }
 
 // SetQoS sets the field that indicates the level of assurance for delivery of an
@@ -93,7 +92,8 @@ func (this *PublishMessage) SetQoS(v byte) error {
 		return fmt.Errorf("publish/SetQoS: Invalid QoS %d.", v)
 	}
 
-	this.flags = (this.flags & 249) | (v << 1) // 243 = 11111001
+	this.mtypeflags[0] = (this.mtypeflags[0] & 249) | (v << 1) // 249 = 11111001
+
 	return nil
 }
 
@@ -111,6 +111,8 @@ func (this *PublishMessage) SetTopic(v []byte) error {
 	}
 
 	this.topic = v
+	this.dirty = true
+
 	return nil
 }
 
@@ -122,9 +124,14 @@ func (this *PublishMessage) Payload() []byte {
 // SetPayload sets the application message that's part of the PUBLISH message.
 func (this *PublishMessage) SetPayload(v []byte) {
 	this.payload = v
+	this.dirty = true
 }
 
 func (this *PublishMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -158,7 +165,8 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	// The packet identifier field is only present in the PUBLISH packets where the
 	// QoS level is 1 or 2
 	if this.QoS() != 0 {
-		this.packetId = binary.BigEndian.Uint16(src[total:])
+		//this.packetId = binary.BigEndian.Uint16(src[total:])
+		this.packetId = src[total : total+2]
 		total += 2
 	}
 
@@ -166,10 +174,20 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	this.payload = src[total : total+l]
 	total += len(this.payload)
 
+	this.dirty = false
+
 	return total, nil
 }
 
 func (this *PublishMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("publish/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	if len(this.topic) == 0 {
 		return 0, fmt.Errorf("publish/Encode: Topic name is empty.")
 	}
@@ -206,12 +224,14 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 
 	// The packet identifier field is only present in the PUBLISH packets where the QoS level is 1 or 2
 	if this.QoS() != 0 {
-		if this.packetId == 0 {
-			this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+		if this.PacketId() == 0 {
+			this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+			//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 		}
 
-		binary.BigEndian.PutUint16(dst[total:], this.packetId)
-		total += 2
+		n = copy(dst[total:], this.packetId)
+		//binary.BigEndian.PutUint16(dst[total:], this.packetId)
+		total += n
 	}
 
 	copy(dst[total:], this.payload)

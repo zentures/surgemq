@@ -17,7 +17,7 @@ package message
 // A PINGRESP Packet is sent by the Server to the Client in response to a PINGREQ
 // Packet. It indicates that the Server is alive.
 type PingrespMessage struct {
-	header
+	DisconnectMessage
 }
 
 var _ Message = (*PingrespMessage)(nil)
@@ -28,12 +28,4 @@ func NewPingrespMessage() *PingrespMessage {
 	msg.SetType(PINGRESP)
 
 	return msg
-}
-
-func (this *PingrespMessage) Decode(src []byte) (int, error) {
-	return this.header.decode(src)
-}
-
-func (this *PingrespMessage) Encode(dst []byte) (int, error) {
-	return this.header.encode(dst)
 }
