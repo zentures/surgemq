@@ -26,13 +26,13 @@ import (
 )
 
 var (
-	messages  int    = 1000000
-	senders   int    = 1
-	receivers int    = 1
-	msgsize   int    = 1024
-	topic     []byte = []byte("test")
-	qos       byte   = 0
-	nap       int    = 10
+	messages    int    = 100000
+	publishers  int    = 1
+	subscribers int    = 1
+	size        int    = 1024
+	topic       []byte = []byte("test")
+	qos         byte   = 0
+	nap         int    = 10
 
 	subdone, rcvdone, sentdone int64
 
@@ -50,34 +50,41 @@ var (
 
 func init() {
 	flag.IntVar(&messages, "messages", messages, "number of messages to send")
-	flag.IntVar(&senders, "senders", senders, "number of senders to start (in FullMesh, only this is used)")
-	flag.IntVar(&receivers, "receivers", receivers, "number of receivers to start (in FullMesh, this is NOT used")
-	flag.IntVar(&msgsize, "msgsize", msgsize, "size of message payload to send")
+	flag.IntVar(&publishers, "publishers", publishers, "number of publishers to start (in FullMesh, only this is used)")
+	flag.IntVar(&subscribers, "subscribers", subscribers, "number of subscribers to start (in FullMesh, this is NOT used")
+	flag.IntVar(&size, "size", size, "size of message payload to send, minimum 10 bytes")
 	flag.Parse()
 }
 
 func runClientTest(t testing.TB, cid int, wg *sync.WaitGroup, f func(*service.Client)) {
 	defer wg.Done()
 
-	uri := "tcp://127.0.0.1:1883"
-	svc := connectToServer(t, uri, cid)
-
-	assert.NotNil(t, true, svc)
-
-	if f != nil {
-		f(svc)
+	if size < 10 {
+		size = 10
 	}
 
-	svc.Disconnect()
+	uri := "tcp://127.0.0.1:1883"
+	c := connectToServer(t, uri, cid)
+	if c == nil {
+		return
+	}
+
+	if f != nil {
+		f(c)
+	}
+
+	c.Disconnect()
 }
 
 func connectToServer(t testing.TB, uri string, cid int) *service.Client {
+	c := &service.Client{}
+
 	msg := newConnectMessage(cid)
 
-	svc, err := service.Connect(uri, msg)
+	err := c.Connect(uri, msg)
 	assert.NoError(t, true, err)
 
-	return svc
+	return c
 }
 
 func newSubscribeMessage(topic string, qos byte) *message.SubscribeMessage {

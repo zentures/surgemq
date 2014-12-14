@@ -24,22 +24,53 @@ import (
 )
 
 var (
-	errQueueFull      error = errors.New("queue full")
-	errQueueEmpty     error = errors.New("queue empty")
-	errAckWaitMessage error = errors.New("Invalid message to wait for ack")
-	errAckMessage     error = errors.New("Invalid message for acking")
+	errQueueFull   error = errors.New("queue full")
+	errQueueEmpty  error = errors.New("queue empty")
+	errWaitMessage error = errors.New("Invalid message to wait for ack")
+	errAckMessage  error = errors.New("Invalid message for acking")
 )
 
 type ackmsg struct {
-	msg message.Message
-	ack message.Message
+	// Message type of the message waiting for ack
+	mtype message.MessageType
 
-	pktid uint16
+	// Current state of the ack-waiting message
 	state message.MessageType
 
+	// Packet ID of the message. Every message that require ack'ing must have a valid
+	// packet ID. Messages that have message I
+	pktid uint16
+
+	// Slice containing the message bytes
+	msgbuf []byte
+
+	// Slice containing the ack message bytes
+	ackbuf []byte
+
+	// When ack cycle completes, call this function
 	onComplete OnCompleteFunc
 }
 
+// ackqueue is used to store messages that are waiting for acks to come back.
+// There are a few scenarios in which acks are required.
+//  1. Client sends SUBSCRIBE message to server, waits for SUBACK.
+//  2. Client sends UNSUBSCRIBE message to server, waits for UNSUBACK.
+//  3. Client sends PUBLISH QoS 1 message to server, waits for PUBACK.
+//  4. Server sends PUBLISH QoS 1 message to client, waits for PUBACK.
+//  5. Client sends PUBLISH QoS 2 message to server, waits for PUBREC.
+//  6. Server sends PUBREC message to client, waits for PUBREL.
+//  7. Client sends PUBREL message to server, waits for PUBCOMP.
+//  8. Server sends PUBLISH QoS 2 message to client, waits for PUBREC.
+//  9. Client sends PUBREC message to server, waits for PUBREL.
+// 10. Server sends PUBREL message to client, waits for PUBCOMP.
+// 11. Client sends PINGREQ message to server, waits for PINGRESP.
+//
+// ackqueue provides two functions: ackwait() and ack().
+// - ackwait() copies the message into the queue in the order ackwait() is called.
+// - ack() takes the ack message supplied and updates the status of messages waiting.
+//   ack() also checks the head for any messages that have completed its ack cycle,
+//   if there's any, it will be processed them accordingly. If the
+//
 // ackqueue is a growing queue implemented based on a ring buffer. As the buffer
 // gets full, it will auto-grow.
 type ackqueue struct {
@@ -49,11 +80,11 @@ type ackqueue struct {
 	head  int64
 	tail  int64
 
+	ping ackmsg
 	ring []ackmsg
 	emap map[uint16]int64
 
-	ping  ackmsg
-	acked []ackmsg
+	ackdone []ackmsg
 
 	mu sync.Mutex
 }
@@ -65,33 +96,26 @@ func newAckqueue(n int) *ackqueue {
 	}
 
 	return &ackqueue{
-		size:  m,
-		mask:  m - 1,
-		count: 0,
-		head:  0,
-		tail:  0,
-		ring:  make([]ackmsg, m),
-		emap:  make(map[uint16]int64, m),
-		acked: make([]ackmsg, 0),
+		size:    m,
+		mask:    m - 1,
+		count:   0,
+		head:    0,
+		tail:    0,
+		ring:    make([]ackmsg, m),
+		emap:    make(map[uint16]int64, m),
+		ackdone: make([]ackmsg, 0),
 	}
 }
 
-func (this *ackqueue) Len() int {
-	return int(this.count)
-}
-
-func (this *ackqueue) Cap() int {
-	return int(this.size)
-}
-
-func (this *ackqueue) AckWait(msg message.Message, onComplete OnCompleteFunc) error {
+func (this *ackqueue) wait(msg message.Message, onComplete OnCompleteFunc) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	switch msg := msg.(type) {
 	case *message.PublishMessage:
 		if msg.QoS() == message.QosAtMostOnce {
-			return fmt.Errorf("QoS 0 messages don't require ack")
+			//return fmt.Errorf("QoS 0 messages don't require ack")
+			return errWaitMessage
 		}
 
 		this.insert(msg.PacketId(), msg, onComplete)
@@ -103,42 +127,47 @@ func (this *ackqueue) AckWait(msg message.Message, onComplete OnCompleteFunc) er
 		this.insert(msg.PacketId(), msg, onComplete)
 
 	case *message.PingreqMessage:
-		this.ping = ackmsg{msg: msg, onComplete: onComplete}
+		this.ping = ackmsg{
+			mtype:      message.PINGREQ,
+			state:      message.RESERVED,
+			onComplete: onComplete,
+		}
 
 	default:
-		return errAckWaitMessage
+		return errWaitMessage
 	}
 
 	return nil
 }
 
-func (this *ackqueue) Ack(msg message.Message) error {
+func (this *ackqueue) ack(msg message.Message) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
-	switch msg := msg.(type) {
-	case *message.PubackMessage:
-		this.ack(msg.PacketId(), msg)
+	switch msg.Type() {
+	case message.PUBACK, message.PUBREC, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
+		// Check to see if the message w/ the same packet ID is in the queue
+		i, ok := this.emap[msg.PacketId()]
+		if ok {
+			// If message w/ the packet ID exists, update the message state and copy
+			// the ack message
+			this.ring[i].state = msg.Type()
 
-	case *message.PubrecMessage:
-		this.ack(msg.PacketId(), msg)
+			ml := msg.Len()
+			this.ring[i].ackbuf = make([]byte, ml)
 
-	case *message.PubrelMessage:
-		this.ack(msg.PacketId(), msg)
+			_, err := msg.Encode(this.ring[i].ackbuf)
+			if err != nil {
+				return err
+			}
+			//glog.Debugf("Acked: %v", msg)
+			//} else {
+			//glog.Debugf("Cannot ack %s message with packet ID %d", msg.Type(), msg.PacketId())
+		}
 
-	case *message.PubcompMessage:
-		this.ack(msg.PacketId(), msg)
-
-	case *message.SubackMessage:
-		this.ack(msg.PacketId(), msg)
-
-	case *message.UnsubackMessage:
-		this.ack(msg.PacketId(), msg)
-
-	case *message.PingrespMessage:
-		if this.ping.msg != nil {
-			this.ping.ack = msg
-			this.ping.state = msg.Type()
+	case message.PINGRESP:
+		if this.ping.mtype == message.PINGREQ {
+			this.ping.state = message.PINGRESP
 		}
 
 	default:
@@ -148,56 +177,76 @@ func (this *ackqueue) Ack(msg message.Message) error {
 	return nil
 }
 
-func (this *ackqueue) Acked() []ackmsg {
+func (this *ackqueue) acked() []ackmsg {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
-	this.acked = this.acked[0:0]
+	this.ackdone = this.ackdone[0:0]
 
 	if this.ping.state == message.PINGRESP {
-		this.acked = append(this.acked, this.ping)
+		this.ackdone = append(this.ackdone, this.ping)
 		this.ping = ackmsg{}
 	}
 
+FORNOTEMPTY:
 	for !this.empty() {
-		state := this.ring[this.head].state
-
-		if state == message.PUBACK || state == message.PUBREL || state == message.PUBCOMP ||
-			state == message.SUBACK || state == message.UNSUBACK {
-
-			this.acked = append(this.acked, this.ring[this.head])
+		switch this.ring[this.head].state {
+		case message.PUBACK, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
+			this.ackdone = append(this.ackdone, this.ring[this.head])
 			this.removeHead()
-		} else {
-			break
+
+		default:
+			break FORNOTEMPTY
 		}
 	}
 
-	return this.acked
+	return this.ackdone
 }
 
-func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCompleteFunc) {
+func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCompleteFunc) error {
 	if this.full() {
 		this.grow()
 	}
 
-	i, ok := this.emap[pktid]
-	if !ok {
-		this.ring[this.tail] = ackmsg{msg: msg, pktid: pktid, onComplete: onComplete}
+	if _, ok := this.emap[pktid]; !ok {
+		// message length
+		ml := msg.Len()
+
+		// ackmsg
+		am := ackmsg{
+			mtype:      msg.Type(),
+			state:      message.RESERVED,
+			pktid:      msg.PacketId(),
+			msgbuf:     make([]byte, ml),
+			onComplete: onComplete,
+		}
+
+		if _, err := msg.Encode(am.msgbuf); err != nil {
+			return err
+		}
+
+		this.ring[this.tail] = am
 		this.emap[pktid] = this.tail
 		this.tail = this.increment(this.tail)
 		this.count++
 	} else {
-		this.ring[i].msg = msg
-	}
-}
+		// If packet w/ pktid already exist, then this must be a PUBLISH message
+		// Other message types should never send with the same packet ID
+		pm, ok := msg.(*message.PublishMessage)
+		if !ok {
+			return fmt.Errorf("ack/insert: duplicate packet ID for %s message", msg.Name())
+		}
 
-func (this *ackqueue) ack(pktid uint16, msg message.Message) {
-	i, ok := this.emap[pktid]
-	if ok {
-		this.ring[i].state = msg.Type()
-		this.ring[i].ack = msg
+		// If this is a publish message, then the DUP flag must be set. This is the
+		// only scenario in which we will receive duplicate messages.
+		if pm.Dup() {
+			return fmt.Errorf("ack/insert: duplicate packet ID for PUBLISH message, but DUP flag is not set")
+		}
 
+		// Since it's a dup, there's really nothing we need to do. Moving on...
 	}
+
+	return nil
 }
 
 func (this *ackqueue) removeHead() error {
@@ -206,6 +255,7 @@ func (this *ackqueue) removeHead() error {
 	}
 
 	it := this.ring[this.head]
+	// set this to empty ackmsg{} to ensure GC will collect the buffer
 	this.ring[this.head] = ackmsg{}
 	this.head = this.increment(this.head)
 	this.count--
@@ -243,6 +293,14 @@ func (this *ackqueue) grow() {
 	}
 }
 
+func (this *ackqueue) len() int {
+	return int(this.count)
+}
+
+func (this *ackqueue) cap() int {
+	return int(this.size)
+}
+
 func (this *ackqueue) index(n int64) int64 {
 	return n & this.mask
 }
@@ -258,3 +316,47 @@ func (this *ackqueue) empty() bool {
 func (this *ackqueue) increment(n int64) int64 {
 	return this.index(n + 1)
 }
+
+/*
+func (this *ackqueue) Acked() []ackmsg {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
+	this.acked = this.acked[0:0]
+
+	if this.ping.state == message.PINGRESP {
+		this.acked = append(this.acked, this.ping)
+		this.ping = ackmsg{}
+	}
+
+FORNOTEMPTY:
+	for !this.empty() {
+		switch this.ring[this.head].state {
+		case message.PUBACK, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
+			this.acked = append(this.acked, this.ring[this.head])
+			this.removeHead()
+
+		default:
+			break FORNOTEMPTY
+		}
+	}
+
+	return this.acked
+}
+
+func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCompleteFunc) {
+	if this.full() {
+		this.grow()
+	}
+
+	i, ok := this.emap[pktid]
+	if !ok {
+		this.ring[this.tail] = ackmsg{msg: msg, pktid: pktid, onComplete: onComplete}
+		this.emap[pktid] = this.tail
+		this.tail = this.increment(this.tail)
+		this.count++
+	} else {
+		this.ring[i].msg = msg
+	}
+}
+*/

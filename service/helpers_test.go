@@ -24,7 +24,7 @@ import (
 
 	"github.com/dataence/assert"
 	"github.com/surge/surgemq/message"
-	"github.com/surge/surgemq/session"
+	"github.com/surge/surgemq/sessions"
 	"github.com/surge/surgemq/topics"
 )
 
@@ -44,24 +44,18 @@ func runClientServerTests(t testing.TB, f func(*Client)) {
 
 	<-ready1
 
-	var svc *Client
-	if options.Authenticator == "mockFailure" {
-		svc = connectToServer(t, uri, false)
-	} else {
-		svc = connectToServer(t, uri, true)
-	}
-
-	if svc == nil {
+	c := connectToServer(t, uri)
+	if c == nil {
 		return
 	}
 
-	defer topics.Unregister(svc.cid)
+	defer topics.Unregister(c.svc.cid)
 
 	if f != nil {
-		f(svc)
+		f(c)
 	}
 
-	svc.Disconnect()
+	c.Disconnect()
 
 	close(ready2)
 
@@ -75,15 +69,28 @@ func startService(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 c
 	tp := topics.NewMemProvider()
 	topics.Register("mem", tp)
 
-	session.Unregister("mem")
-	sp := session.NewMemProvider()
-	session.Register("mem", sp)
+	sessions.Unregister("mem")
+	sp := sessions.NewMemProvider()
+	sessions.Register("mem", sp)
 
 	conn := listenAndConnect(t, u, ready1)
 
-	svc, err := handleConnection(conn)
-	defer svc.Disconnect()
-	assert.NoError(t, true, err)
+	svr := &Server{
+		Authenticator: authenticator,
+	}
+
+	svc, err := svr.handleConnection(conn)
+	defer func() {
+		if svc != nil {
+			svc.stop()
+		}
+	}()
+	if authenticator == "mockFailure" {
+		assert.Error(t, true, err)
+		return
+	} else {
+		assert.NoError(t, true, err)
+	}
 
 	<-ready2
 }
@@ -101,18 +108,20 @@ func listenAndConnect(t testing.TB, u *url.URL, ready chan struct{}) net.Conn {
 	return conn
 }
 
-func connectToServer(t testing.TB, uri string, success bool) *Client {
+func connectToServer(t testing.TB, uri string) *Client {
+	c := &Client{}
+
 	msg := newConnectMessage()
 
-	svc, err := Connect(uri, msg)
-	if success {
-		assert.NoError(t, true, err)
-	} else {
+	err := c.Connect(uri, msg)
+	if authenticator == "mockFailure" {
 		assert.Error(t, true, err)
 		return nil
+	} else {
+		assert.NoError(t, true, err)
 	}
 
-	return svc
+	return c
 }
 
 func newPubrelMessage(pktid uint16) *message.PubrelMessage {

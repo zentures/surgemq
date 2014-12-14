@@ -15,48 +15,20 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/dataence/glog"
-	"github.com/surge/surgemq/auth"
 	"github.com/surge/surgemq/message"
-	"github.com/surge/surgemq/session"
+	"github.com/surge/surgemq/sessions"
 	"github.com/surge/surgemq/topics"
 )
 
-var (
-	ErrInvalidConnectionType  error = errors.New("service: Invalid connection type")
-	ErrInvalidSubscriber      error = errors.New("service: Invalid subscriber")
-	ErrBufferNotReady         error = errors.New("service: buffer is not ready")
-	ErrBufferInsufficientData error = errors.New("service: buffer has insufficient data.")
-)
-
-type (
-	OnCompleteFunc func(msg, ack message.Message, err error)
-	OnPublishFunc  func(msg *message.PublishMessage) error
-)
-
-type stat struct {
-	bytes int64
-	msgs  int64
-}
-
-func (this *stat) increment(n int64) {
-	this.bytes += n
-	this.msgs++
-}
-
 const (
-	// Queue size for the input queue
+	// Queue size for the ack queue
 	defaultQueueSize = 16
-
-	defaultBufferSize = 1024 * 256
 
 	keyClientId    = "CLIENTID"
 	keyKeepAlive   = "KEEPALIVE"
@@ -70,11 +42,28 @@ const (
 	keyTopicQos    = "TOPICQOS"
 )
 
+type (
+	OnCompleteFunc func(msg, ack message.Message, err error) error
+	OnPublishFunc  func(msg *message.PublishMessage) error
+)
+
+type stat struct {
+	bytes int64
+	msgs  int64
+}
+
+func (this *stat) increment(n int64) {
+	this.bytes += n
+	this.msgs++
+}
+
 var (
 	gsvcid uint64 = 0
 )
 
 type service struct {
+	// The ID of this service, it's not related to the Client ID, just a number that's
+	// incremented for every new service.
 	id uint64
 
 	// Is this a client or server. It's set by either Connect (client) or
@@ -84,19 +73,38 @@ type service struct {
 	// client ID
 	cid string
 
+	// The number of seconds to keep the connection live if there's no data.
+	// If not set then default to 5 mins.
+	keepAlive int
+
+	// The number of seconds to wait for the CONNACK message before disconnecting.
+	// If not set then default to 2 seconds.
+	connectTimeout int
+
+	// The number of seconds to wait for any ACK messages before failing.
+	// If not set then default to 20 seconds.
+	ackTimeout int
+
+	// The number of times to retry sending a packet if ACK is not received.
+	// If no set then default to 3 retries.
+	timeoutRetries int
+
 	// Network connection for this service
 	conn io.Closer
 
-	authMgr   *auth.Manager
-	sessMgr   *session.Manager
+	sessMgr   *sessions.Manager
 	topicsMgr *topics.Manager
 
 	// sess is the session object for this MQTT session. It keeps track session variables
 	// such as ClientId, KeepAlive, Username, etc
-	sess session.Session
+	sess sessions.Session
 
-	// Wait for the various goroutines to finish
-	wg sync.WaitGroup
+	// Wait for the various goroutines to finish starting and stopping
+	wgStarted sync.WaitGroup
+	wgStopped sync.WaitGroup
+
+	// writeMessage mutex - serializes writes to the outgoing buffer.
+	wmu sync.Mutex
 
 	// Whether this is service is closed or not.
 	closed int64
@@ -111,13 +119,22 @@ type service struct {
 	// Outgoing data buffer. Bytes written here are in turn written out to the connection.
 	out *buffer
 
+	pub1ack,
+	pub2in,
+	pub2out,
+	suback,
+	unsuback,
+	pingack *ackqueue
+
+	onpub OnPublishFunc
+
 	// Ack queue. Any messages that require ack'ing are insert here for waiting.
 	// - Publish QoS 1 (at least once) messages wait here until puback is received.
 	// - Publish QoS 2 (exactly once) messages wait here until the cycle of
 	//   publish->pubrec->pubrel->pubcomp cycle is done.
 	// - Subscribe messages wait for suback.
 	// - Unsubscribe messages wait for unsuback.
-	ack *ackqueue
+	//ack *ackqueue
 
 	inStat  stat
 	outStat stat
@@ -127,175 +144,75 @@ type service struct {
 
 	subs []interface{}
 	qoss []byte
-
-	// writeMessage mutex - serializes writes to the outgoing buffer.
-	wmu sync.Mutex
-
-	// close mutex -
-	cmu sync.Mutex
 }
 
-func (this *service) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
-	if msg.QoS() == 0 {
-		_, err := this.writeMessage(msg)
-		if err != nil {
-			//glog.Errorf("(%d) Error sending publish message: %v", this.id, err)
-			return err
-		}
+func (this *service) start() error {
+	var err error
 
-		if onComplete != nil {
-			onComplete(msg, nil, nil)
-		}
-
-		return nil
+	this.in, err = newBuffer(defaultBufferSize)
+	if err != nil {
+		return err
 	}
 
-	return this.sendAndAckWait(msg, onComplete)
-}
-
-func (this *service) Subscribe(msg *message.SubscribeMessage, onComplete OnCompleteFunc, onPublish OnPublishFunc) error {
-	if onPublish == nil {
-		return fmt.Errorf("onPublish function is nil. No need to subscribe.")
+	this.out, err = newBuffer(defaultBufferSize)
+	if err != nil {
+		return err
 	}
 
-	return this.sendAndAckWait(msg, func(msg, ack message.Message, err error) {
-		if err != nil {
-			if onComplete != nil {
-				onComplete(msg, ack, err)
-			}
-		}
+	this.pub1ack = newAckqueue(defaultQueueSize)
+	this.pub2in = newAckqueue(defaultQueueSize)
+	this.pub2out = newAckqueue(defaultQueueSize)
+	this.suback = newAckqueue(defaultQueueSize)
+	this.unsuback = newAckqueue(defaultQueueSize)
+	this.pingack = newAckqueue(defaultQueueSize)
 
-		sub, ok := msg.(*message.SubscribeMessage)
-		if !ok {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Invalid SubscribeMessage received"))
-			}
-			return
-		}
-
-		suback, ok := ack.(*message.SubackMessage)
-		if !ok {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Invalid SubackMessage received"))
-			}
-			return
-		}
-
-		if sub.PacketId() != suback.PacketId() {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Sub and Suback packet ID not the same. %d != %d.", sub.PacketId(), suback.PacketId()))
-			}
-			return
-		}
-
-		retcodes := suback.ReturnCodes()
-		topics := sub.Topics()
-
-		if len(topics) != len(retcodes) {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Incorrect number of return codes received. Expecting %d, got %d.", len(topics), len(retcodes)))
-			}
-			return
-		}
-
-		var err2 error = nil
-
-		for i, t := range topics {
-			c := retcodes[i]
-
-			if c == message.QosFailure {
-				err2 = fmt.Errorf("Failed to subscribe to '%s'\n%v", string(t), err2)
-			} else {
-				addTopic(this.sess, string(t), c)
-				_, err := this.topicsMgr.Subscribe(t, c, onPublish)
-				if err != nil {
-					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
-				}
-			}
-		}
-
-		if onComplete != nil {
-			onComplete(msg, ack, err2)
-		}
-	})
-}
-
-func (this *service) Unsubscribe(msg *message.UnsubscribeMessage, onComplete OnCompleteFunc) error {
-	return this.sendAndAckWait(msg, func(msg, ack message.Message, err error) {
-		if err != nil {
-			if onComplete != nil {
-				onComplete(msg, ack, err)
-			}
-		}
-
-		unsub, ok := msg.(*message.UnsubscribeMessage)
-		if !ok {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Invalid UnsubscribeMessage received"))
-			}
-			return
-		}
-
-		unsuback, ok := ack.(*message.UnsubackMessage)
-		if !ok {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Invalid UnsubackMessage received"))
-			}
-			return
-		}
-
-		if unsub.PacketId() != unsuback.PacketId() {
-			if onComplete != nil {
-				onComplete(msg, ack, fmt.Errorf("Unsub and Unsuback packet ID not the same. %d != %d.", unsub.PacketId(), unsuback.PacketId()))
-			}
-			return
-		}
-
-		var err2 error = nil
-
-		for _, tb := range unsub.Topics() {
-			// Remove all subscribers, which basically it's just this client, since
-			// each client has it's own topic tree.
-			err := this.topicsMgr.Unsubscribe(tb, nil)
-			if err != nil {
-				err2 = fmt.Errorf("%v\n%v", err2, err)
+	if !this.client {
+		this.onpub = func(msg *message.PublishMessage) error {
+			if err := this.publish(msg, nil); err != nil {
+				glog.Errorf("service/onPublish: Error publishing message: %v", err)
+				return err
 			}
 
-			removeTopic(this.sess, string(tb))
+			return nil
 		}
+	}
 
-		if onComplete != nil {
-			onComplete(msg, ack, err2)
-		} else {
-			glog.Errorf("%v", err2)
-		}
-	})
-}
+	// Processor is responsible for reading messages out of the buffer and processing
+	// them accordingly.
+	this.wgStarted.Add(1)
+	this.wgStopped.Add(1)
+	go this.processor()
 
-func (this *service) Ping(onComplete OnCompleteFunc) error {
-	msg := message.NewPingreqMessage()
-	return this.sendAndAckWait(msg, onComplete)
-}
+	// Receiver is responsible for reading from the connection and putting data into
+	// a buffer.
+	this.wgStarted.Add(1)
+	this.wgStopped.Add(1)
+	go this.receiver()
 
-func (this *service) Disconnect() {
-	//msg := message.NewDisconnectMessage()
-	this.close()
+	// Sender is responsible for writing data in the buffer into the connection.
+	this.wgStarted.Add(1)
+	this.wgStopped.Add(1)
+	go this.sender()
+
+	this.wgStarted.Wait()
+
+	return nil
 }
 
 // FIXME: The order of closing here causes panic sometimes. For example, if receiver
 // calls this, and closes the buffers, somehow it causes buffer.go:476 to panid.
-func (this *service) close() {
-	doit := atomic.CompareAndSwapInt64(&this.closed, 0, 1)
-	if !doit {
-		return
-	}
-
+func (this *service) stop() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
 			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
 		}
 	}()
+
+	doit := atomic.CompareAndSwapInt64(&this.closed, 0, 1)
+	if !doit {
+		return
+	}
 
 	// Close quit channel, effectively telling all the goroutines it's time to quit
 	if this.done != nil {
@@ -309,14 +226,17 @@ func (this *service) close() {
 		this.conn.Close()
 	}
 
-	// Unsubscribe from all the topics for this client
-	if this.sess != nil {
+	// Unsubscribe from all the topics for this client, only for the server side though
+
+	if !this.client && this.sess != nil {
 		topics, _, err := getTopicsQoss(this.sess)
 		if err != nil {
 			glog.Errorf("(%s/%d): %v", this.cid, this.id, err)
 		} else {
 			for _, t := range topics {
-				this.topicsMgr.Unsubscribe([]byte(t), this)
+				if err := this.topicsMgr.Unsubscribe([]byte(t), &this.onpub); err != nil {
+					glog.Errorf("(%d/%s): Error unsubscribing topic %q: %v", this.id, this.cid, t, err)
+				}
 			}
 		}
 	}
@@ -339,413 +259,197 @@ func (this *service) close() {
 		this.out.Close()
 	}
 
-	this.wg.Wait()
+	this.wgStopped.Wait()
 
 	this.conn = nil
 	this.in = nil
 	this.out = nil
 }
 
-// Copied from http://golang.org/src/pkg/net/timeout_test.go
-func isTimeout(err error) bool {
-	e, ok := err.(net.Error)
-	return ok && e.Timeout()
-}
-
-func (this *service) initSendRecv() error {
-	var err error
-
-	this.in, err = newBuffer(defaultBufferSize)
-	if err != nil {
-		return err
-	}
-
-	this.out, err = newBuffer(defaultBufferSize)
-	if err != nil {
-		return err
-	}
-
-	// Receiver is responsible for reading from the connection and putting data into
-	// a buffer.
-	this.wg.Add(1)
-	go this.receiver()
-
-	// Sender is responsible for writing data in the buffer into the connection.
-	this.wg.Add(1)
-	go this.sender()
-
-	return nil
-}
-
-func (this *service) initProcessor() error {
-	this.ack = newAckqueue(defaultQueueSize)
-
-	// Processor is responsible for reading messages out of the buffer and processing
-	// them accordingly.
-	this.wg.Add(1)
-	go this.processor()
-
-	return nil
-}
-
-func (this *service) connectClient() error {
-
-	// To establish a connection, we must
-	// 1. Read and decode the message.ConnectMessage from the wire
-	// 2. If no decoding errors, then authenticate using username and password.
-	//    Otherwise, write out to the wire message.ConnackMessage with
-	//    appropriate error.
-	// 3. If authentication is successful, then either create a new session or
-	//    retrieve existing session
-	// 4. Write out to the wire a successful message.ConnackMessage message
-
-	// Read the CONNECT message from the wire, if error, then check to see if it's
-	// a CONNACK error. If it's CONNACK error, send the proper CONNACK error back
-	// to client. Exit regardless of error type.
-
-	resp := message.NewConnackMessage()
-
-	mtype, _, total, err := this.peekMessageSize()
-	if err != nil {
-		return err
-	}
-
-	if mtype != message.CONNECT {
-		return fmt.Errorf("Received invalid CONNACK message")
-	}
-
-	mreq, nreq, err := this.peekMessage(mtype, total)
-	if err != nil {
-		if cerr, ok := err.(message.ConnackCode); ok {
-			glog.Debugf("request  message: %s\nresponse message: %s\nerror           : %v", mreq, resp, err)
-			resp.SetReturnCode(cerr)
-			resp.SetSessionPresent(false)
-			this.writeMessage(resp)
-		}
-		return err
-	}
-	defer this.in.ReadCommit(nreq)
-
-	req, ok := mreq.(*message.ConnectMessage)
-	if !ok {
-		return fmt.Errorf("Received invalid CONNECT message")
-	}
-
-	if err := this.getServerManagers(); err != nil {
-		glog.Errorf("%d) %v", this.id, err)
-	}
-
-	// Authenticate the user, if error, return error and exit
-	err = this.authMgr.Authenticate(string(req.Username()), string(req.Password()))
-	if err != nil {
-		resp.SetReturnCode(message.ErrBadUsernameOrPassword)
-		resp.SetSessionPresent(false)
-		_, err := this.writeMessage(resp)
-		return err
-	}
-
-	err = this.getServerSession(req, resp)
-	if err != nil {
-		return err
-	}
-
-	resp.SetReturnCode(message.ConnectionAccepted)
-
-	nresp, err := this.writeMessage(resp)
-	if err != nil {
-		return err
-	}
-
-	this.inStat.increment(int64(nreq))
-	this.outStat.increment(int64(nresp))
-
-	return nil
-}
-
-func (this *service) getServerSession(req *message.ConnectMessage, resp *message.ConnackMessage) error {
-	// If CleanSession is set to 0, the server MUST resume communications with the
-	// client based on state from the current session, as identified by the client
-	// identifier. If there is no session associated with the client identifier the
-	// server must create a new session.
-	//
-	// If CleanSession is set to 1, the client and server must discard any previous
-	// session and start a new one. This session lasts as long as the network c
-	// onnection. State data associated with this session must not be reused in any
-	// subsequent session.
-
-	var err error
-
-	// Check to see if the client supplied an ID, if not, generate one and set
-	// clean session.
-	if len(req.ClientId()) == 0 {
-		this.cid = fmt.Sprintf("internalclient%d", this.id)
-		req.SetClientId([]byte(this.cid))
-		req.SetCleanSession(true)
-	} else {
-		this.cid = string(req.ClientId())
-	}
-
-	// If CleanSession is NOT set, check the session store for existing session.
-	// If found, return it.
-	if !req.CleanSession() {
-		if this.sess, err = this.sessMgr.Get(this.cid); err == nil {
-			resp.SetSessionPresent(true)
-		}
-	}
-
-	// If CleanSession, or no existing session found, then create a new one
-	if this.sess == nil {
-		if this.sess, err = this.sessMgr.New(this.cid); err != nil {
-			return err
-		}
-
-		resp.SetSessionPresent(false)
-	}
-
-	this.sess.Set(keyClientId, this.cid)
-	this.sess.Set(keyKeepAlive, time.Duration(req.KeepAlive()))
-	this.sess.Set(keyUsername, string(req.Username()))
-	this.sess.Set(keyWillRetain, req.WillRetain())
-	this.sess.Set(keyWillQos, req.WillQos())
-	this.sess.Set(keyWillTopic, string(req.WillTopic()))
-	this.sess.Set(keyWillMessage, string(req.WillMessage()))
-	this.sess.Set(keyVersion, req.Version())
-
-	topics, qoss, err := getTopicsQoss(this.sess)
-	if err != nil {
-		return err
-	} else {
-
-		for i, t := range topics {
-			this.topicsMgr.Subscribe([]byte(t), qoss[i], this)
-		}
-	}
-
-	return nil
-}
-
-func (this *service) connectToServer(msg *message.ConnectMessage) error {
-	nreq, err := this.writeMessage(msg)
-	if err != nil {
-		return err
-	}
-
-	mtype, _, total, err := this.peekMessageSize()
-	if err != nil {
-		return err
-	}
-
-	if mtype != message.CONNACK {
-		return fmt.Errorf("Received invalid CONNACK message")
-	}
-
-	mresp, nresp, err := this.peekMessage(mtype, total)
-	if err != nil {
-		return err
-	}
-	defer this.in.ReadCommit(nresp)
-
-	resp, ok := mresp.(*message.ConnackMessage)
-	if !ok {
-		return fmt.Errorf("Received invalid CONNACK message")
-	}
-
-	ret := resp.ReturnCode()
-	if ret != message.ConnectionAccepted {
-		return ret
-	}
-
-	this.sessMgr, err = session.NewManager(options.SessionProvider)
-	if err != nil {
-		glog.Errorf("(%d) Error retrieving session manager: %v", this.id, err)
-		return err
-	}
-
-	err = this.getClientSession(msg, resp)
-	if err != nil {
-		return err
-	}
-
-	p := topics.NewMemProvider()
-	topics.Register(this.cid, p)
-
-	this.topicsMgr, err = topics.NewManager(this.cid)
-	if err != nil {
-		glog.Errorf("(%d) Error retrieving topics manager: %v", this.id, err)
-		return err
-	}
-
-	this.inStat.increment(int64(nreq))
-	this.outStat.increment(int64(nresp))
-
-	return nil
-}
-
-func (this *service) getClientSession(req *message.ConnectMessage, resp *message.ConnackMessage) error {
-	var err error
-
-	if this.sess == nil {
-		if this.sess, err = this.sessMgr.New(this.cid); err != nil {
-			return err
-		}
-	}
-
-	this.cid = string(req.ClientId())
-	this.sess.Set(keyClientId, this.cid)
-	this.sess.Set(keyKeepAlive, time.Duration(req.KeepAlive()))
-	this.sess.Set(keyUsername, string(req.Username()))
-	this.sess.Set(keyWillRetain, req.WillRetain())
-	this.sess.Set(keyWillQos, req.WillQos())
-	this.sess.Set(keyWillTopic, string(req.WillTopic()))
-	this.sess.Set(keyWillMessage, string(req.WillMessage()))
-	this.sess.Set(keyVersion, req.Version())
-
-	return nil
-}
-
-func (this *service) sendAndAckWait(msg message.Message, onComplete OnCompleteFunc) error {
-	// FIXME: For any message that needs to go wait in the ackqueue, we should make a copy of that
+func (this *service) publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
 	_, err := this.writeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("(%s) Error sending %s message: %v", this.cid, msg.Name(), err)
 	}
 
-	return this.ack.AckWait(msg, onComplete)
-}
-
-func (this *service) getServerManagers() error {
-	var err error
-
-	this.authMgr, err = auth.NewManager(options.Authenticator)
-	if err != nil {
-		glog.Errorf("(%d) Error retrieving authentication manager: %v", this.id, err)
-		return err
-	}
-
-	this.sessMgr, err = session.NewManager(options.SessionProvider)
-	if err != nil {
-		glog.Errorf("(%d) Error retrieving session manager: %v", this.id, err)
-		return err
-	}
-
-	this.topicsMgr, err = topics.NewManager("mem")
-	if err != nil {
-		glog.Errorf("(%d) Error retrieving topics manager: %v", this.id, err)
-		return err
-	}
-
-	return nil
-}
-
-func addTopic(sess session.Session, topic string, qos byte) error {
-	topics, qoss, err := getTopicsQoss(sess)
-	if err != nil {
-		return err
-	}
-
-	found := false
-
-	// Update subscription if already exist
-	for i, t := range topics {
-		if topic == t {
-			qoss[i] = qos
-			found = true
-			break
+	switch msg.QoS() {
+	case message.QosAtMostOnce:
+		if onComplete != nil {
+			return onComplete(msg, nil, nil)
 		}
-	}
 
-	if !found {
-		// Otherwise add it
-		topics = append(topics, topic)
-		qoss = append(qoss, qos)
-	}
+		return nil
 
-	sess.Set(keyTopics, topics)
-	sess.Set(keyTopicQos, qoss)
+	case message.QosAtLeastOnce:
+		return this.pub1ack.wait(msg, onComplete)
+
+	case message.QosExactlyOnce:
+		return this.pub2out.wait(msg, onComplete)
+	}
 
 	return nil
 }
 
-func removeTopic(sess session.Session, topic string) error {
-	topics, qoss, err := getTopicsQoss(sess)
-	if err != nil {
-		return err
+func (this *service) subscribe(msg *message.SubscribeMessage, onComplete OnCompleteFunc, onPublish OnPublishFunc) error {
+	if onPublish == nil {
+		return fmt.Errorf("onPublish function is nil. No need to subscribe.")
 	}
 
-	// Delete subscription if already exist
-	for i, t := range topics {
-		if topic == t {
-			topics = append(topics[:i], topics[i+1:]...)
-			qoss = append(qoss[:i], qoss[i+1:]...)
-			break
+	_, err := this.writeMessage(msg)
+	if err != nil {
+		return fmt.Errorf("(%s) Error sending %s message: %v", this.cid, msg.Name(), err)
+	}
+
+	onc := func(msg, ack message.Message, err error) error {
+		onComplete := onComplete
+		onPublish := onPublish
+
+		if err != nil {
+			if onComplete != nil {
+				return onComplete(msg, ack, err)
+			}
+			return err
 		}
-	}
 
-	sess.Set(keyTopics, topics)
-	sess.Set(keyTopicQos, qoss)
-
-	return nil
-}
-
-func getTopicsQoss(sess session.Session) ([]string, []byte, error) {
-	var (
-		topics []string
-		qoss   []byte
-		ok     bool
-	)
-
-	ti, err := sess.Get(keyTopics)
-	if err != nil {
-		topics = make([]string, 0)
-	} else {
-		topics, ok = ti.([]string)
+		sub, ok := msg.(*message.SubscribeMessage)
 		if !ok {
-			return nil, nil, fmt.Errorf("topics is not a string slice")
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Invalid SubscribeMessage received"))
+			}
+			return nil
 		}
-	}
 
-	qi, err := sess.Get(keyTopicQos)
-	if err != nil {
-		qoss = make([]byte, 0)
-	} else {
-		qoss, ok = qi.([]byte)
+		suback, ok := ack.(*message.SubackMessage)
 		if !ok {
-			return nil, nil, fmt.Errorf("QoS is not a byte slice")
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Invalid SubackMessage received"))
+			}
+			return nil
 		}
+
+		if sub.PacketId() != suback.PacketId() {
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Sub and Suback packet ID not the same. %d != %d.", sub.PacketId(), suback.PacketId()))
+			}
+			return nil
+		}
+
+		retcodes := suback.ReturnCodes()
+		topics := sub.Topics()
+
+		if len(topics) != len(retcodes) {
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Incorrect number of return codes received. Expecting %d, got %d.", len(topics), len(retcodes)))
+			}
+			return nil
+		}
+
+		var err2 error = nil
+
+		for i, t := range topics {
+			c := retcodes[i]
+
+			if c == message.QosFailure {
+				err2 = fmt.Errorf("Failed to subscribe to '%s'\n%v", string(t), err2)
+			} else {
+				addTopic(this.sess, string(t), c)
+				_, err := this.topicsMgr.Subscribe(t, c, &onPublish)
+				if err != nil {
+					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
+				}
+			}
+		}
+
+		if onComplete != nil {
+			return onComplete(msg, ack, err2)
+		}
+
+		return err2
 	}
 
-	if len(topics) != len(qoss) {
-		return nil, nil, fmt.Errorf("Number of topics (%d) != number of QoS (%d)", len(topics), len(qoss))
+	return this.suback.wait(msg, onc)
+}
+
+func (this *service) unsubscribe(msg *message.UnsubscribeMessage, onComplete OnCompleteFunc) error {
+	_, err := this.writeMessage(msg)
+	if err != nil {
+		return fmt.Errorf("(%s) Error sending %s message: %v", this.cid, msg.Name(), err)
 	}
 
-	return topics, qoss, nil
+	onc := func(msg, ack message.Message, err error) error {
+		onComplete := onComplete
+
+		if err != nil {
+			if onComplete != nil {
+				return onComplete(msg, ack, err)
+			}
+			return err
+		}
+
+		unsub, ok := msg.(*message.UnsubscribeMessage)
+		if !ok {
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Invalid UnsubscribeMessage received"))
+			}
+			return nil
+		}
+
+		unsuback, ok := ack.(*message.UnsubackMessage)
+		if !ok {
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Invalid UnsubackMessage received"))
+			}
+			return nil
+		}
+
+		if unsub.PacketId() != unsuback.PacketId() {
+			if onComplete != nil {
+				return onComplete(msg, ack, fmt.Errorf("Unsub and Unsuback packet ID not the same. %d != %d.", unsub.PacketId(), unsuback.PacketId()))
+			}
+			return nil
+		}
+
+		var err2 error = nil
+
+		for _, tb := range unsub.Topics() {
+			// Remove all subscribers, which basically it's just this client, since
+			// each client has it's own topic tree.
+			err := this.topicsMgr.Unsubscribe(tb, nil)
+			if err != nil {
+				err2 = fmt.Errorf("%v\n%v", err2, err)
+			}
+
+			removeTopic(this.sess, string(tb))
+		}
+
+		if onComplete != nil {
+			return onComplete(msg, ack, err2)
+		}
+
+		return err2
+	}
+
+	return this.unsuback.wait(msg, onc)
 }
 
-func powerOfTwo64(n int64) bool {
-	return n != 0 && (n&(n-1)) == 0
+func (this *service) ping(onComplete OnCompleteFunc) error {
+	msg := message.NewPingreqMessage()
+
+	_, err := this.writeMessage(msg)
+	if err != nil {
+		return fmt.Errorf("(%s) Error sending %s message: %v", this.cid, msg.Name(), err)
+	}
+
+	return this.pingack.wait(msg, onComplete)
 }
 
-func roundUpPowerOfTwo32(n int32) int32 {
-	n--
-	n |= n >> 1
-	n |= n >> 2
-	n |= n >> 4
-	n |= n >> 8
-	n |= n >> 16
-	n++
+func (this *service) isDone() bool {
+	select {
+	case <-this.done:
+		return true
 
-	return n
-}
+	default:
+	}
 
-func roundUppowerOfTwo64(n int64) int64 {
-	n--
-	n |= n >> 1
-	n |= n >> 2
-	n |= n >> 4
-	n |= n >> 8
-	n |= n >> 16
-	n |= n >> 32
-	n++
-
-	return n
+	return false
 }

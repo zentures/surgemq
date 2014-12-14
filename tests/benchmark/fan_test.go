@@ -43,16 +43,16 @@ func TestFan(t *testing.T) {
 	done = make(chan struct{})
 	done2 = make(chan struct{})
 
-	for i := 1; i < receivers+1; i++ {
+	for i := 1; i < subscribers+1; i++ {
 		time.Sleep(time.Millisecond * 20)
 		wg.Add(1)
-		go startFanReceiver(t, i, &wg)
+		go startFanSubscribers(t, i, &wg)
 	}
 
-	for i := receivers + 1; i < senders+receivers+1; i++ {
+	for i := subscribers + 1; i < publishers+subscribers+1; i++ {
 		time.Sleep(time.Millisecond * 20)
 		wg.Add(1)
-		go startFanSender(t, i, &wg)
+		go startFanPublisher(t, i, &wg)
 	}
 
 	wg.Wait()
@@ -61,22 +61,23 @@ func TestFan(t *testing.T) {
 	glog.Infof("Total Received %d messages in %d ns, %d ns/msg, %d msgs/sec", totalRcvd, sentSince, int(float64(sentSince)/float64(totalRcvd)), int(float64(totalRcvd)/(float64(sentSince)/float64(time.Second))))
 }
 
-func startFanReceiver(t testing.TB, cid int, wg *sync.WaitGroup) {
+func startFanSubscribers(t testing.TB, cid int, wg *sync.WaitGroup) {
 	now := time.Now()
 
 	runClientTest(t, cid, wg, func(svc *service.Client) {
-		cnt := messages
+		cnt := messages * publishers
 		received := 0
 		since := time.Since(now).Nanoseconds()
 
 		sub := newSubscribeMessage("test", 0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				subs := atomic.AddInt64(&subdone, 1)
-				if subs == int64(receivers) {
+				if subs == int64(subscribers) {
 					now = time.Now()
 					close(done)
 				}
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				if received == 0 {
@@ -89,7 +90,7 @@ func startFanReceiver(t testing.TB, cid int, wg *sync.WaitGroup) {
 
 				if received == cnt {
 					rcvd := atomic.AddInt64(&rcvdone, 1)
-					if rcvd == int64(receivers) {
+					if rcvd == int64(subscribers) {
 						close(done2)
 					}
 				}
@@ -99,14 +100,14 @@ func startFanReceiver(t testing.TB, cid int, wg *sync.WaitGroup) {
 
 		select {
 		case <-done:
-		case <-time.After(time.Second * time.Duration(receivers)):
+		case <-time.After(time.Second * time.Duration(subscribers)):
 			glog.Infof("(surgemq%d) Timed out waiting for subscribe response", cid)
 			return
 		}
 
 		select {
 		case <-done2:
-		case <-time.Tick(time.Second * time.Duration(nap*senders)):
+		case <-time.Tick(time.Second * time.Duration(nap*publishers)):
 			glog.Errorf("Timed out waiting for messages to be received.")
 		}
 
@@ -118,17 +119,17 @@ func startFanReceiver(t testing.TB, cid int, wg *sync.WaitGroup) {
 		}
 		statMu.Unlock()
 
-		glog.Infof("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
+		glog.Debugf("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
 	})
 }
 
-func startFanSender(t testing.TB, cid int, wg *sync.WaitGroup) {
+func startFanPublisher(t testing.TB, cid int, wg *sync.WaitGroup) {
 	now := time.Now()
 
 	runClientTest(t, cid, wg, func(svc *service.Client) {
 		select {
 		case <-done:
-		case <-time.After(time.Second * time.Duration(receivers)):
+		case <-time.After(time.Second * time.Duration(subscribers)):
 			glog.Infof("(surgemq%d) Timed out waiting for subscribe response", cid)
 			return
 		}
@@ -136,7 +137,7 @@ func startFanSender(t testing.TB, cid int, wg *sync.WaitGroup) {
 		cnt := messages
 		sent := 0
 
-		payload := make([]byte, msgsize)
+		payload := make([]byte, size)
 		msg := message.NewPublishMessage()
 		msg.SetTopic(topic)
 		msg.SetQoS(qos)
@@ -162,11 +163,11 @@ func startFanSender(t testing.TB, cid int, wg *sync.WaitGroup) {
 		}
 		statMu.Unlock()
 
-		glog.Infof("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
+		glog.Debugf("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
 
 		select {
 		case <-done2:
-		case <-time.Tick(time.Second * time.Duration(nap*senders)):
+		case <-time.Tick(time.Second * time.Duration(nap*publishers)):
 			glog.Errorf("Timed out waiting for messages to be received.")
 		}
 	})

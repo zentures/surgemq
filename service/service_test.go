@@ -15,6 +15,7 @@
 package service
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,28 +24,32 @@ import (
 	"github.com/surge/surgemq/message"
 )
 
+var authenticator string = "mockSuccess"
+
 func TestServiceConnectClientServer(t *testing.T) {
 	runClientServerTests(t, nil)
 }
 
 func TestServiceConnectAuthError(t *testing.T) {
-	old := options.Authenticator
-	options.Authenticator = "mockFailure"
+	old := authenticator
+	authenticator = "mockFailure"
 	runClientServerTests(t, nil)
-	options.Authenticator = old
+	authenticator = old
 }
 
 func TestServiceSubUnsubSuccess(t *testing.T) {
-	runClientServerTests(t, func(svc *Client) {
+	runClientServerTests(t, func(c *Client) {
 		done := make(chan struct{})
 
 		sub := newSubscribeMessage(1)
-		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+		c.Subscribe(sub,
+			func(msg, ack message.Message, err error) error {
 				unsub := newUnsubscribeMessage()
-				svc.Unsubscribe(unsub, func(msg, ack message.Message, err error) {
+				return c.Unsubscribe(unsub, func(msg, ack message.Message, err error) error {
 					close(done)
+					return nil
 				})
+
 			},
 			func(msg *message.PublishMessage) error {
 				return nil
@@ -69,8 +74,9 @@ func TestServiceSub0Pub0(t *testing.T) {
 
 		sub := newSubscribeMessage(0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				assertPublishMessage(t, msg, count, 0)
@@ -119,8 +125,9 @@ func TestServiceSub1Pub0(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				assertPublishMessage(t, msg, count, 0)
@@ -169,8 +176,9 @@ func TestServiceSub0Pub1(t *testing.T) {
 
 		sub := newSubscribeMessage(0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				assert.Fail(t, true, "Should not have received any publish message")
@@ -187,7 +195,7 @@ func TestServiceSub0Pub1(t *testing.T) {
 			msg := newPublishMessage(i, 1)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) {
+				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
 					assert.NoError(t, true, err)
@@ -203,6 +211,8 @@ func TestServiceSub0Pub1(t *testing.T) {
 					if pub.PacketId() == 10 {
 						close(done2)
 					}
+
+					return nil
 				})
 		}
 
@@ -233,8 +243,9 @@ func TestServiceSub1Pub1(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				count++
@@ -258,7 +269,7 @@ func TestServiceSub1Pub1(t *testing.T) {
 			msg := newPublishMessage(i, 1)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) {
+				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
 					assert.NoError(t, true, err)
@@ -274,6 +285,8 @@ func TestServiceSub1Pub1(t *testing.T) {
 					if pub.PacketId() == 10 {
 						close(done3)
 					}
+
+					return nil
 				})
 		}
 
@@ -308,8 +321,9 @@ func TestServiceSub2Pub1(t *testing.T) {
 
 		sub := newSubscribeMessage(2)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				count++
@@ -333,7 +347,7 @@ func TestServiceSub2Pub1(t *testing.T) {
 			msg := newPublishMessage(i, 1)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) {
+				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
 					assert.NoError(t, true, err)
@@ -349,6 +363,8 @@ func TestServiceSub2Pub1(t *testing.T) {
 					if pub.PacketId() == 10 {
 						close(done3)
 					}
+
+					return nil
 				})
 		}
 
@@ -381,8 +397,9 @@ func TestServiceSub1Pub2(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				assert.Fail(t, true, "Should not have received any publish message")
@@ -399,7 +416,7 @@ func TestServiceSub1Pub2(t *testing.T) {
 			msg := newPublishMessage(i, 2)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) {
+				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
 					assert.NoError(t, true, err)
@@ -415,6 +432,8 @@ func TestServiceSub1Pub2(t *testing.T) {
 					if pub.PacketId() == 10 {
 						close(done2)
 					}
+
+					return nil
 				})
 		}
 
@@ -445,8 +464,9 @@ func TestServiceSub2Pub2(t *testing.T) {
 
 		sub := newSubscribeMessage(2)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				close(done)
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				count++
@@ -472,7 +492,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 			msg := newPublishMessage(i, 2)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) {
+				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
 					assert.NoError(t, true, err)
@@ -488,6 +508,8 @@ func TestServiceSub2Pub2(t *testing.T) {
 					if pub.PacketId() == 10 {
 						close(done3)
 					}
+
+					return nil
 				})
 		}
 
@@ -496,7 +518,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 			assert.Equal(t, true, 10, count)
 
 		case <-time.After(time.Millisecond * 300):
-			assert.Fail(t, true, "Timed out waiting for publish messages")
+			assert.Fail(t, true, fmt.Sprintf("Timed out waiting for publish messages. Expecting %d, got %d.", 10, count))
 		}
 
 		select {

@@ -23,7 +23,7 @@ import (
 	"github.com/dataence/assert"
 )
 
-func TestSequence(t *testing.T) {
+func TestBufferSequence(t *testing.T) {
 	seq := newSequence()
 
 	seq.set(100)

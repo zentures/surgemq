@@ -14,10 +14,7 @@
 
 package message
 
-import (
-	"encoding/binary"
-	"fmt"
-)
+import "fmt"
 
 // A SUBACK Packet is sent by the Server to the Client to confirm receipt and processing
 // of a SUBSCRIBE Packet.
@@ -42,7 +39,7 @@ func NewSubackMessage() *SubackMessage {
 
 // String returns a string representation of the message.
 func (this SubackMessage) String() string {
-	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v", this.header, this.packetId, this.returnCodes)
+	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v", this.header, this.PacketId(), this.returnCodes)
 }
 
 // ReturnCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
@@ -61,6 +58,8 @@ func (this *SubackMessage) AddReturnCodes(ret []byte) error {
 		this.returnCodes = append(this.returnCodes, c)
 	}
 
+	this.dirty = true
+
 	return nil
 }
 
@@ -70,6 +69,10 @@ func (this *SubackMessage) AddReturnCode(ret byte) error {
 }
 
 func (this *SubackMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -88,7 +91,8 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 
-	this.packetId = binary.BigEndian.Uint16(src[total:])
+	//this.packetId = binary.BigEndian.Uint16(src[total:])
+	this.packetId = src[total : total+2]
 	total += 2
 
 	l := int(this.remlen) - (total - hn)
@@ -101,10 +105,20 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 		}
 	}
 
+	this.dirty = false
+
 	return total, nil
 }
 
 func (this *SubackMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("suback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	for i, code := range this.returnCodes {
 		if code != 0x00 && code != 0x01 && code != 0x02 && code != 0x80 {
 			return 0, fmt.Errorf("suback/Encode: Invalid return code %d for topic %d", code, i)
@@ -130,7 +144,9 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 		return total, err
 	}
 
-	binary.BigEndian.PutUint16(dst[total:], this.packetId)
+	if copy(dst[total:total+2], this.packetId) != 2 {
+		dst[total], dst[total+1] = 0, 0
+	}
 	total += 2
 
 	copy(dst[total:], this.returnCodes)

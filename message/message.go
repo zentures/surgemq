@@ -16,6 +16,7 @@ package message
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 )
 
@@ -76,6 +77,10 @@ type Message interface {
 	// Type returns the MessageType of the Message. The retured value should be one
 	// of the constants defined for MessageType.
 	Type() MessageType
+
+	// PacketId returns the packet ID of the Message. The retured value is 0 if
+	// there's no packet ID for this message type. Otherwise non-0.
+	PacketId() uint16
 
 	// Encode writes the message bytes into the byte array from the argument. It
 	// returns the number of bytes encoded and whether there's any errors along
@@ -146,6 +151,10 @@ const (
 	// RESERVED2 is a reserved value and should be considered an invalid message type.
 	RESERVED2
 )
+
+func (this MessageType) String() string {
+	return this.Name()
+}
 
 // Name returns the name of the message type. It should correspond to one of the
 // constant values defined for MessageType. It is statically defined and cannot
@@ -337,4 +346,45 @@ func ValidVersion(v byte) bool {
 func ValidConnackError(err error) bool {
 	return err == ErrInvalidProtocolVersion || err == ErrIdentifierRejected ||
 		err == ErrServerUnavailable || err == ErrBadUsernameOrPassword || err == ErrNotAuthorized
+}
+
+// Read length prefixed bytes
+func readLPBytes(buf []byte) ([]byte, int, error) {
+	if len(buf) < 2 {
+		return nil, 0, fmt.Errorf("utils/readLPBytes: Insufficient buffer size. Expecting %d, got %d.", 2, len(buf))
+	}
+
+	n, total := 0, 0
+
+	n = int(binary.BigEndian.Uint16(buf))
+	total += 2
+
+	if len(buf) < n {
+		return nil, total, fmt.Errorf("utils/readLPBytes: Insufficient buffer size. Expecting %d, got %d.", n, len(buf))
+	}
+
+	total += n
+
+	return buf[2:total], total, nil
+}
+
+// Write length prefixed bytes
+func writeLPBytes(buf []byte, b []byte) (int, error) {
+	total, n := 0, len(b)
+
+	if n > int(maxLPString) {
+		return 0, fmt.Errorf("utils/writeLPBytes: Length (%d) greater than %d bytes.", n, maxLPString)
+	}
+
+	if len(buf) < 2+n {
+		return 0, fmt.Errorf("utils/writeLPBytes: Insufficient buffer size. Expecting %d, got %d.", 2+n, len(buf))
+	}
+
+	binary.BigEndian.PutUint16(buf, uint16(n))
+	total += 2
+
+	copy(buf[total:], b)
+	total += n
+
+	return total, nil
 }

@@ -16,7 +16,6 @@ package message
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"sync/atomic"
 )
@@ -45,10 +44,10 @@ func NewSubscribeMessage() *SubscribeMessage {
 }
 
 func (this SubscribeMessage) String() string {
-	msgstr := fmt.Sprintf("%s", this.header)
+	msgstr := fmt.Sprintf("%s, Packet ID=%d", this.header, this.PacketId())
 
 	for i, t := range this.topics {
-		msgstr = fmt.Sprintf("%s, Topic%d=%s (%d)", msgstr, i, string(t), this.qos[i])
+		msgstr = fmt.Sprintf("%s, Topic[%d]=%q/%d", msgstr, i, string(t), this.qos[i])
 	}
 
 	return msgstr
@@ -84,6 +83,7 @@ func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 
 	this.topics = append(this.topics, topic)
 	this.qos = append(this.qos, qos)
+	this.dirty = true
 
 	return nil
 }
@@ -106,6 +106,8 @@ func (this *SubscribeMessage) RemoveTopic(topic []byte) {
 		this.topics = append(this.topics[:i], this.topics[i+1:]...)
 		this.qos = append(this.qos[:i], this.qos[i+1:]...)
 	}
+
+	this.dirty = true
 }
 
 // TopicExists checks to see if a topic exists in the list.
@@ -137,6 +139,10 @@ func (this *SubscribeMessage) Qos() []byte {
 }
 
 func (this *SubscribeMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -155,7 +161,8 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 
-	this.packetId = binary.BigEndian.Uint16(src[total:])
+	//this.packetId = binary.BigEndian.Uint16(src[total:])
+	this.packetId = src[total : total+2]
 	total += 2
 
 	remlen := int(this.remlen) - (total - hn)
@@ -178,10 +185,20 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 		return 0, fmt.Errorf("subscribe/Decode: Empty topic list")
 	}
 
+	this.dirty = false
+
 	return total, nil
 }
 
 func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	hl := this.header.msglen()
 	ml := this.msglen()
 
@@ -201,12 +218,14 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 		return total, err
 	}
 
-	if this.packetId == 0 {
-		this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if this.PacketId() == 0 {
+		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 	}
 
-	binary.BigEndian.PutUint16(dst[total:], this.packetId)
-	total += 2
+	n = copy(dst[total:], this.packetId)
+	//binary.BigEndian.PutUint16(dst[total:], this.packetId)
+	total += n
 
 	for i, t := range this.topics {
 		n, err := writeLPBytes(dst[total:], t)

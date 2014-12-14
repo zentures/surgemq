@@ -20,7 +20,7 @@ package message
 // 2. Request that the Server responds to confirm that it is alive.
 // 3. Exercise the network to indicate that the Network Connection is active.
 type PingreqMessage struct {
-	header
+	DisconnectMessage
 }
 
 var _ Message = (*PingreqMessage)(nil)
@@ -31,12 +31,4 @@ func NewPingreqMessage() *PingreqMessage {
 	msg.SetType(PINGREQ)
 
 	return msg
-}
-
-func (this *PingreqMessage) Decode(src []byte) (int, error) {
-	return this.header.decode(src)
-}
-
-func (this *PingreqMessage) Encode(dst []byte) (int, error) {
-	return this.header.encode(dst)
 }

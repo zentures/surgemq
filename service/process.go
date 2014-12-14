@@ -17,7 +17,6 @@ package service
 import (
 	"fmt"
 	"io"
-	"reflect"
 
 	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
@@ -25,17 +24,24 @@ import (
 
 func (this *service) processor() {
 	defer func() {
-		this.wg.Done()
-		this.close()
+		// Let's recover from panic
+		if r := recover(); r != nil {
+			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
+		}
+
+		this.wgStopped.Done()
+		this.stop()
 
 		glog.Debugf("(%s) Stopping processor", this.cid)
 	}()
 
 	glog.Debugf("(%s) Starting processor", this.cid)
 
+	this.wgStarted.Done()
+
 	for {
 		// 1. Find out what message is next and the size of the message
-		mtype, qos, total, err := this.peekMessageSize()
+		mtype, total, err := this.peekMessageSize()
 		if err != nil {
 			if err != io.EOF {
 				glog.Errorf("(%s) Error peeking next message size: %v", this.cid, err)
@@ -48,34 +54,12 @@ func (this *service) processor() {
 			return
 		}
 
-		var (
-			msg  message.Message
-			peek bool = false
-		)
-
-		// 3. Depending on the type, we either read the msg into another buffer, or we
-		//    peek the message in the existing buffer.
-		//
-		//    If msg type is PUBLISH QOS 2, then we need to read it because it needs to
-		//    be kept in ackqueue for acks, and we want to be able to move forward while
-		//    waiting for the acks to come.
-		if mtype == message.PUBLISH && qos == message.QosExactlyOnce {
-			msg, _, err = this.readMessage(mtype, total)
-			if err != nil {
-				if err != io.EOF {
-					glog.Errorf("(%s) Error reading next message: %v", this.cid, err)
-				}
-				return
+		msg, _, err := this.peekMessage(mtype, total)
+		if err != nil {
+			if err != io.EOF {
+				glog.Errorf("(%s) Error peeking next message: %v", this.cid, err)
 			}
-		} else {
-			msg, _, err = this.peekMessage(mtype, total)
-			if err != nil {
-				if err != io.EOF {
-					glog.Errorf("(%s) Error peeking next message: %v", this.cid, err)
-				}
-				return
-			}
-			peek = true
+			return
 		}
 
 		// 4. Check to see if done is closed, if so, exit
@@ -83,7 +67,7 @@ func (this *service) processor() {
 			return
 		}
 
-		//glog.Debugf("(%d/%s) received %v", this.id, this.cid, msg)
+		//glog.Debugf("(%d/%s) Received: %v", this.id, this.cid, msg)
 
 		// 5. Process the read message
 		err = this.processIncoming(msg)
@@ -91,97 +75,67 @@ func (this *service) processor() {
 			glog.Errorf("(%d/%s) Error processing %s: %v", this.id, this.cid, msg.Name(), err)
 		}
 
-		// 6. If this was a peek, then we should commit the bytes in the buffer so we
-		//    can move on
-		if peek {
-			_, err := this.in.ReadCommit(total)
-			if err != nil {
-				if err != io.EOF {
-					glog.Errorf("(%s) Error committing %d read bytes: %v", this.cid, total, err)
-				}
-				return
+		// 6. We should commit the bytes in the buffer so we can move on
+		_, err = this.in.ReadCommit(total)
+		if err != nil {
+			if err != io.EOF {
+				glog.Errorf("(%s) Error committing %d read bytes: %v", this.cid, total, err)
 			}
+			return
 		}
 
 		// 7. Check to see if done is closed, if so, exit
 		if this.isDone() {
 			return
 		}
-
-		// 8. Finally process all the acked messages. There's acked messages if the
-		//    previously processed message is an ack response.
-		this.processAcked()
-	}
-}
-
-func (this *service) isDone() bool {
-	select {
-	case <-this.done:
-		return true
-
-	default:
-	}
-
-	return false
-}
-
-func (this *service) processAcked() {
-	for _, ackmsg := range this.ack.Acked() {
-		var err error = nil
-
-		switch ackmsg.msg.Type() {
-		case message.PUBLISH:
-			// If ack is PUBACK, that means this service sent the message and it got
-			// ack'ed. Then don't send it out again. Similarly, if the ack is PUBCOMP,
-			// that also means this service sent the message and it should not be
-			// send again.
-			if ackmsg.ack.Type() != message.PUBCOMP && ackmsg.ack.Type() != message.PUBACK {
-				err = this.onPublish(ackmsg.msg.(*message.PublishMessage))
-			}
-
-		case message.SUBSCRIBE, message.UNSUBSCRIBE, message.PINGRESP:
-			// nothing to do here
-
-		default:
-			err = fmt.Errorf("Invalid message type.")
-		}
-
-		if err != nil {
-			if err != io.EOF {
-				glog.Errorf("(%s) Error processing ack'ed %s message: %v", this.cid, ackmsg.msg.Name(), err)
-			}
-		}
-
-		if ackmsg.onComplete != nil {
-			ackmsg.onComplete(ackmsg.msg, ackmsg.ack, err)
-		}
 	}
 }
 
 func (this *service) processIncoming(msg message.Message) error {
+	var err error = nil
+
 	switch msg := msg.(type) {
 	case *message.PublishMessage:
 		// For PUBLISH message, we should figure out what QoS it is and process accordingly
 		// If QoS == 0, we should just take the next step, no ack required
 		// If QoS == 1, we should send back PUBACK, then take the next step
 		// If QoS == 2, we need to put it in the ack queue, send back PUBREC
-		return this.processPublish(msg)
+		err = this.processPublish(msg)
 
 	case *message.PubackMessage:
 		// For PUBACK message, it means QoS 1, we should send to ack queue
-		this.ack.Ack(msg)
+		this.pub1ack.ack(msg)
+		this.processAcked(this.pub1ack)
 
 	case *message.PubrecMessage:
 		// For PUBREC message, it means QoS 2, we should send to ack queue, and send back PUBREL
-		return this.processPubrec(msg)
+		if err = this.pub2out.ack(msg); err != nil {
+			break
+		}
+
+		resp := message.NewPubrelMessage()
+		resp.SetPacketId(msg.PacketId())
+		_, err = this.writeMessage(resp)
 
 	case *message.PubrelMessage:
 		// For PUBREL message, it means QoS 2, we should send to ack queue, and send back PUBCOMP
-		return this.processPubrel(msg)
+		if err = this.pub2in.ack(msg); err != nil {
+			break
+		}
+
+		this.processAcked(this.pub2in)
+
+		resp := message.NewPubcompMessage()
+		resp.SetPacketId(msg.PacketId())
+		_, err = this.writeMessage(resp)
 
 	case *message.PubcompMessage:
 		// For PUBCOMP message, it means QoS 2, we should send to ack queue
-		this.ack.Ack(msg)
+		if err = this.pub2out.ack(msg); err != nil {
+			break
+		}
+
+		this.processAcked(this.pub2out)
 
 	case *message.SubscribeMessage:
 		// For SUBSCRIBE message, we should add subscriber, then send back SUBACK
@@ -189,7 +143,8 @@ func (this *service) processIncoming(msg message.Message) error {
 
 	case *message.SubackMessage:
 		// For SUBACK message, we should send to ack queue
-		this.ack.Ack(msg)
+		this.suback.ack(msg)
+		this.processAcked(this.suback)
 
 	case *message.UnsubscribeMessage:
 		// For UNSUBSCRIBE message, we should remove subscriber, then send back UNSUBACK
@@ -197,29 +152,103 @@ func (this *service) processIncoming(msg message.Message) error {
 
 	case *message.UnsubackMessage:
 		// For UNSUBACK message, we should send to ack queue
-		this.ack.Ack(msg)
+		this.unsuback.ack(msg)
+		this.processAcked(this.unsuback)
 
 	case *message.PingreqMessage:
 		// For PINGREQ message, we should send back PINGRESP
-		// Using a closure so we can use defer, too lazy to separate into another function
-		return func() error {
-			resp := message.NewPingrespMessage()
-			_, err := this.writeMessage(resp)
-			return err
-		}()
+		resp := message.NewPingrespMessage()
+		_, err = this.writeMessage(resp)
 
 	case *message.PingrespMessage:
-		this.ack.Ack(msg)
+		this.pingack.ack(msg)
+		this.processAcked(this.pingack)
 
 	case *message.DisconnectMessage:
 		// For DISCONNECT message, we should quit
-		this.Disconnect()
+		this.stop()
 
 	default:
 		return fmt.Errorf("(%s) invalid message type %s.", this.cid, msg.Name())
 	}
 
-	return nil
+	if err != nil {
+		glog.Debugf("(%d/%s) Error processing acked message: %v", this.id, this.cid, err)
+	}
+
+	return err
+}
+
+func (this *service) processAcked(ackq *ackqueue) {
+	for _, ackmsg := range ackq.acked() {
+		// Let's get the messages from the saved message byte slices.
+		msg, err := ackmsg.mtype.New()
+		if err != nil {
+			glog.Errorf("process/processAcked: Unable to creating new %s message: %v", ackmsg.mtype, err)
+			continue
+		}
+
+		if _, err := msg.Decode(ackmsg.msgbuf); err != nil {
+			glog.Errorf("process/processAcked: Unable to decode %s message: %v", ackmsg.mtype, err)
+			continue
+		}
+
+		ack, err := ackmsg.state.New()
+		if err != nil {
+			glog.Errorf("process/processAcked: Unable to creating new %s message: %v", ackmsg.state, err)
+			continue
+		}
+
+		if _, err := ack.Decode(ackmsg.ackbuf); err != nil {
+			glog.Errorf("process/processAcked: Unable to decode %s message: %v", ackmsg.state, err)
+			continue
+		}
+
+		//glog.Debugf("(%d/%s) Processing acked message: %v", this.id, this.cid, ack)
+
+		// - PUBACK if it's QoS 1 message. This is on the client side.
+		// - PUBREL if it's QoS 2 message. This is on the server side.
+		// - PUBCOMP if it's QoS 2 message. This is on the client side.
+		// - SUBACK if it's a subscribe message. This is on the client side.
+		// - UNSUBACK if it's a unsubscribe message. This is on the client side.
+		switch ackmsg.state {
+		case message.PUBREL:
+			// If ack is PUBREL, that means the QoS 2 message sent by a remote client is
+			// releassed, so let's publish it to other subscribers.
+			if err = this.onPublish(msg.(*message.PublishMessage)); err != nil {
+				glog.Errorf("(%s) Error processing ack'ed %s message: %v", this.cid, ackmsg.mtype, err)
+			}
+
+		case message.PUBACK, message.PUBCOMP, message.SUBACK, message.UNSUBACK, message.PINGRESP:
+			// If ack is PUBACK, that means the QoS 1 message sent by this service got
+			// ack'ed. There's nothing to do other than calling onComplete() below.
+
+			// If ack is PUBCOMP, that means the QoS 2 message sent by this service got
+			// ack'ed. There's nothing to do other than calling onComplete() below.
+
+			// If ack is SUBACK, that means the SUBSCRIBE message sent by this service
+			// got ack'ed. There's nothing to do other than calling onComplete() below.
+
+			// If ack is UNSUBACK, that means the SUBSCRIBE message sent by this service
+			// got ack'ed. There's nothing to do other than calling onComplete() below.
+
+			// If ack is PINGRESP, that means the PINGREQ message sent by this service
+			// got ack'ed. There's nothing to do other than calling onComplete() below.
+
+			err = nil
+
+		default:
+			glog.Errorf("(%s) Invalid ack message type %s.", this.cid, ackmsg.state)
+			continue
+		}
+
+		// Call the registered onComplete function
+		if ackmsg.onComplete != nil {
+			if err := ackmsg.onComplete(msg, ack, err); err != nil {
+				glog.Errorf("process/processAcked: Error running onComplete(): %v", err)
+			}
+		}
+	}
 }
 
 // For PUBLISH message, we should figure out what QoS it is and process accordingly
@@ -229,7 +258,7 @@ func (this *service) processIncoming(msg message.Message) error {
 func (this *service) processPublish(msg *message.PublishMessage) error {
 	switch msg.QoS() {
 	case message.QosExactlyOnce:
-		this.ack.AckWait(msg, nil)
+		this.pub2in.wait(msg, nil)
 
 		resp := message.NewPubrecMessage()
 		resp.SetPacketId(msg.PacketId())
@@ -254,28 +283,6 @@ func (this *service) processPublish(msg *message.PublishMessage) error {
 	return fmt.Errorf("(%s) invalid message QoS %d.", this.cid, msg.QoS())
 }
 
-// For PUBREC message, it means QoS 2, we should send to ack queue, and send back PUBREL
-func (this *service) processPubrec(msg *message.PubrecMessage) error {
-	this.ack.Ack(msg)
-
-	resp := message.NewPubrelMessage()
-	resp.SetPacketId(msg.PacketId())
-
-	_, err := this.writeMessage(resp)
-	return err
-}
-
-// For PUBREL message, it means QoS 2, we should send to ack queue, and send back PUBCOMP
-func (this *service) processPubrel(msg *message.PubrelMessage) error {
-	this.ack.Ack(msg)
-
-	resp := message.NewPubcompMessage()
-	resp.SetPacketId(msg.PacketId())
-
-	_, err := this.writeMessage(resp)
-	return err
-}
-
 // For SUBSCRIBE message, we should add subscriber, then send back SUBACK
 func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 	resp := message.NewSubackMessage()
@@ -288,7 +295,7 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 	qos := msg.Qos()
 
 	for i, t := range topics {
-		rqos, err := this.topicsMgr.Subscribe(t, qos[i], this)
+		rqos, err := this.topicsMgr.Subscribe(t, qos[i], &this.onpub)
 		if err != nil {
 			return err
 		}
@@ -320,56 +327,38 @@ func (this *service) processUnsubscribe(msg *message.UnsubscribeMessage) error {
 	return err
 }
 
-func (this *service) onPublish(msg *message.PublishMessage) error {
-	if this.client {
-		return this.clientPublish(msg)
-	}
-
-	return this.serverPublish(msg)
-}
-
-func (this *service) serverPublish(msg *message.PublishMessage) error {
-	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
-	if err != nil {
+// onServerPublish is the method that gets added to the topic subscribers list by the
+// processSubscribe() method. When the server finishes the ack cycle for a PUBLISH
+// message, it will call the subscriber, which is this method.
+//
+// For the server, when this method is called, it means there's a message that should
+// be published to the client on the other end of this connection. So we will call
+// publish() to send the message.
+func (this *service) onServerPublish(msg *message.PublishMessage) error {
+	if err := this.publish(msg, nil); err != nil {
+		glog.Errorf("process/onServerPublish: Error publishing message: %v", err)
 		return err
-	}
-
-	for i, s := range this.subs {
-		svc, ok := s.(*service)
-		if !ok {
-			glog.Errorf("Disconnecting client: cannot type assert svc (%s) to *service", reflect.TypeOf(svc).Name())
-			this.topicsMgr.Unsubscribe(msg.Topic(), svc)
-			svc.Disconnect()
-		} else {
-			//glog.Debugf("(%d/%s) Publishing to %d/%d %s: %v", this.id, this.cid, i+1, len(this.subs), svc.cid, msg)
-			msg.SetPacketId(0)
-			msg.SetQoS(this.qoss[i])
-			err := svc.Publish(msg, nil)
-			if err == ErrBufferNotReady {
-				glog.Errorf("Disconnecting client: cannot type assert svc to *service: %s", reflect.TypeOf(svc).Name())
-				this.topicsMgr.Unsubscribe(msg.Topic(), svc)
-				svc.Disconnect()
-			}
-		}
 	}
 
 	return nil
 }
 
-func (this *service) clientPublish(msg *message.PublishMessage) error {
+func (this *service) onPublish(msg *message.PublishMessage) error {
 	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss)
 	if err != nil {
+		glog.Errorf("(%d/%s) Error retrieving subscribers list: %v", this.id, this.cid, err)
 		return err
 	}
 
+	//glog.Debugf("(%d/%s) Publishing to topic %s and %d subscribers", this.id, this.cid, string(msg.Topic()), len(this.subs))
 	for _, s := range this.subs {
 		if s != nil {
-			fn, ok := s.(OnPublishFunc)
+			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				glog.Errorf("Invalid onPublish Function")
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				fn(msg)
+				(*fn)(msg)
 			}
 		}
 	}

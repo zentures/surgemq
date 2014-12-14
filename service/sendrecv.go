@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/dataence/glog"
 	"github.com/gorilla/websocket"
@@ -27,21 +28,32 @@ import (
 
 func (this *service) receiver() {
 	defer func() {
-		this.wg.Done()
-		this.close()
+		// Let's recover from panic
+		if r := recover(); r != nil {
+			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
+		}
+
+		this.wgStopped.Done()
+		this.stop()
 
 		glog.Debugf("(%s) Stopping receiver", this.cid)
 	}()
 
 	glog.Debugf("(%s) Starting receiver", this.cid)
 
+	this.wgStarted.Done()
+
 	switch conn := this.conn.(type) {
 	case net.Conn:
+		conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.keepAlive)))
+
 		for {
 			_, err := this.in.ReadFrom(conn)
 
 			if err != nil {
-				glog.Errorf("(%d/%s) error reading from connection: %v", this.id, this.cid, err)
+				if !this.isDone() {
+					glog.Errorf("(%d/%s) error reading from connection: %v", this.id, this.cid, err)
+				}
 				return
 			}
 		}
@@ -56,13 +68,20 @@ func (this *service) receiver() {
 
 func (this *service) sender() {
 	defer func() {
-		this.wg.Done()
-		this.close()
+		// Let's recover from panic
+		if r := recover(); r != nil {
+			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
+		}
+
+		this.wgStopped.Done()
+		this.stop()
 
 		glog.Debugf("(%s) Stopping sender", this.cid)
 	}()
 
 	glog.Debugf("(%s) Starting sender", this.cid)
+
+	this.wgStarted.Done()
 
 	switch conn := this.conn.(type) {
 	case net.Conn:
@@ -85,7 +104,7 @@ func (this *service) sender() {
 	}
 }
 
-func (this *service) peekMessageSize() (message.MessageType, byte, int, error) {
+func (this *service) peekMessageSize() (message.MessageType, int, error) {
 	var (
 		b   []byte
 		err error
@@ -94,20 +113,20 @@ func (this *service) peekMessageSize() (message.MessageType, byte, int, error) {
 
 	if this.in == nil {
 		err = ErrBufferNotReady
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 
 	// Let's read enough bytes to get the message header (msg type, remaining length)
 	for {
 		// If we have read 5 bytes and still not done, then there's a problem.
 		if cnt > 5 {
-			return 0, 0, 0, fmt.Errorf("sendrecv/peekMessageSize: 4th byte of remaining length has continuation bit set")
+			return 0, 0, fmt.Errorf("sendrecv/peekMessageSize: 4th byte of remaining length has continuation bit set")
 		}
 
 		// Peek cnt bytes from the input buffer.
 		b, err = this.in.ReadWait(cnt)
 		if err != nil {
-			return 0, 0, 0, err
+			return 0, 0, err
 		}
 
 		// If not enough bytes are returned, then continue until there's enough.
@@ -132,9 +151,9 @@ func (this *service) peekMessageSize() (message.MessageType, byte, int, error) {
 
 	mtype := message.MessageType(b[0] >> 4)
 
-	qos := ((b[0] & 0x0f) >> 1) & 0x3
+	//qos := ((b[0] & 0x0f) >> 1) & 0x3
 
-	return mtype, qos, total, err
+	return mtype, total, err
 }
 
 func (this *service) peekMessage(mtype message.MessageType, total int) (message.Message, int, error) {

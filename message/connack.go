@@ -42,8 +42,7 @@ func NewConnackMessage() *ConnackMessage {
 
 // String returns a string representation of the CONNACK message
 func (this ConnackMessage) String() string {
-	return fmt.Sprintf("%s, Session Present=%t, Return code=%s\n",
-		this.header, this.sessionPresent, this.returnCode)
+	return fmt.Sprintf("%s, Session Present=%t, Return code=%q\n", this.header, this.sessionPresent, this.returnCode)
 }
 
 // SessionPresent returns the session present flag value
@@ -58,6 +57,8 @@ func (this *ConnackMessage) SetSessionPresent(v bool) {
 	} else {
 		this.sessionPresent = false
 	}
+
+	this.dirty = true
 }
 
 // ReturnCode returns the return code received for the CONNECT message. The return
@@ -68,9 +69,14 @@ func (this *ConnackMessage) ReturnCode() ConnackCode {
 
 func (this *ConnackMessage) SetReturnCode(ret ConnackCode) {
 	this.returnCode = ret
+	this.dirty = true
 }
 
 func (this *ConnackMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -108,10 +114,20 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	this.returnCode = ConnackCode(b)
 	total++
 
+	this.dirty = false
+
 	return total, nil
 }
 
 func (this *ConnackMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	// CONNACK remaining length fixed at 2 bytes
 	hl := this.header.msglen()
 	ml := this.msglen()

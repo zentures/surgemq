@@ -41,9 +41,8 @@ func TestMesh(t *testing.T) {
 	rcvdone = 0
 
 	done = make(chan struct{})
-	done2 = make(chan struct{})
 
-	for i := 1; i < senders+1; i++ {
+	for i := 1; i < publishers+1; i++ {
 		time.Sleep(time.Millisecond * 20)
 		wg.Add(1)
 		go startMeshClient(t, i, &wg)
@@ -60,7 +59,7 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 		done2 := make(chan struct{})
 
 		cnt := messages
-		expected := senders * cnt
+		expected := publishers * cnt
 
 		received := 0
 		sent := 0
@@ -70,11 +69,12 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 
 		sub := newSubscribeMessage("test", 0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) {
+			func(msg, ack message.Message, err error) error {
 				subs := atomic.AddInt64(&subdone, 1)
-				if subs == int64(senders) {
+				if subs == int64(publishers) {
 					close(done)
 				}
+				return nil
 			},
 			func(msg *message.PublishMessage) error {
 				if received == 0 {
@@ -94,12 +94,12 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 
 		select {
 		case <-done:
-		case <-time.After(time.Second * time.Duration(senders)):
+		case <-time.After(time.Second * time.Duration(publishers)):
 			glog.Infof("(surgemq%d) Timed out waiting for subscribe response", cid)
 			return
 		}
 
-		payload := make([]byte, msgsize)
+		payload := make([]byte, size)
 		msg := message.NewPublishMessage()
 		msg.SetTopic(topic)
 		msg.SetQoS(qos)
@@ -128,12 +128,12 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 			}
 			statMu.Unlock()
 
-			glog.Infof("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
+			glog.Debugf("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
 		}()
 
 		select {
 		case <-done2:
-		case <-time.Tick(time.Second * time.Duration(nap*senders)):
+		case <-time.Tick(time.Second * time.Duration(nap*publishers)):
 			glog.Errorf("Timed out waiting for messages to be received.")
 		}
 
@@ -145,6 +145,6 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 		}
 		statMu.Unlock()
 
-		glog.Infof("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
+		glog.Debugf("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
 	})
 }

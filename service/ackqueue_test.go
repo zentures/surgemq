@@ -23,30 +23,28 @@ import (
 
 func TestAckQueueOutOfOrder(t *testing.T) {
 	q := newAckqueue(5)
-	assert.Equal(t, true, 8, q.Cap())
+	assert.Equal(t, true, 8, q.cap())
 
 	for i := 0; i < 12; i++ {
-		msg := message.NewPublishMessage()
-		msg.SetPacketId(uint16(i))
-		msg.SetQoS(1)
-		q.AckWait(msg, nil)
+		msg := newPublishMessage(uint16(i), 1)
+		q.wait(msg, nil)
 	}
 
-	assert.Equal(t, true, 12, q.Len())
+	assert.Equal(t, true, 12, q.len())
 
 	ack1 := message.NewPubackMessage()
 	ack1.SetPacketId(1)
-	q.Ack(ack1)
+	q.ack(ack1)
 
-	acked := q.Acked()
+	acked := q.acked()
 
 	assert.Equal(t, true, 0, len(acked))
 
 	ack0 := message.NewPubackMessage()
 	ack0.SetPacketId(0)
-	q.Ack(ack0)
+	q.ack(ack0)
 
-	acked = q.Acked()
+	acked = q.acked()
 
 	assert.Equal(t, true, 2, len(acked))
 }

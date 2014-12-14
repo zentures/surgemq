@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package session
+package sessions
 
 import (
 	"crypto/rand"
@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	ErrSessionProviderNotFound = errors.New("auth: Session provider not found")
+	ErrSessionsProviderNotFound = errors.New("auth: Session provider not found")
 
-	providers = make(map[string]SessionProvider)
+	providers = make(map[string]SessionsProvider)
 )
 
 type Session interface {
@@ -35,7 +35,7 @@ type Session interface {
 	ID() string
 }
 
-type SessionProvider interface {
+type SessionsProvider interface {
 	New(id string) (Session, error)
 	Get(id string) (Session, error)
 	Del(id string)
@@ -46,7 +46,7 @@ type SessionProvider interface {
 // Register makes a session provider available by the provided name.
 // If a Register is called twice with the same name or if the driver is nil,
 // it panics.
-func Register(name string, provider SessionProvider) {
+func Register(name string, provider SessionsProvider) {
 	if provider == nil {
 		panic("session: Register provide is nil")
 	}
@@ -63,7 +63,7 @@ func Unregister(name string) {
 }
 
 type Manager struct {
-	p SessionProvider
+	p SessionsProvider
 }
 
 func NewManager(providerName string) (*Manager, error) {

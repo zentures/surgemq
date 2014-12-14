@@ -23,7 +23,7 @@ import (
 var clientIdRegexp *regexp.Regexp
 
 func init() {
-	clientIdRegexp, _ = regexp.Compile("^[0-9a-zA-Z ]*$")
+	clientIdRegexp = regexp.MustCompile("^[0-9a-zA-Z ]*$")
 }
 
 // After a Network Connection is established by a Client to a Server, the first Packet
@@ -69,7 +69,7 @@ func NewConnectMessage() *ConnectMessage {
 
 // String returns a string representation of the CONNECT message
 func (this ConnectMessage) String() string {
-	return fmt.Sprintf("%s, Connect Flags=%08b, Version=%d, KeepAlive=%d, Client ID=%s, Will Topic=%s, Will Message=%s, Username=%s, Password=%s",
+	return fmt.Sprintf("%s, Connect Flags=%08b, Version=%d, KeepAlive=%d, Client ID=%q, Will Topic=%q, Will Message=%q, Username=%q, Password=%q",
 		this.header,
 		this.connectFlags,
 		this.Version(),
@@ -96,6 +96,8 @@ func (this *ConnectMessage) SetVersion(v byte) error {
 	}
 
 	this.version = v
+	this.dirty = true
+
 	return nil
 }
 
@@ -114,6 +116,8 @@ func (this *ConnectMessage) SetCleanSession(v bool) {
 	} else {
 		this.connectFlags &= 253 // 11111101
 	}
+
+	this.dirty = true
 }
 
 // WillFlag returns the bit that specifies whether a Will Message should be stored
@@ -132,6 +136,8 @@ func (this *ConnectMessage) SetWillFlag(v bool) {
 	} else {
 		this.connectFlags &= 251 // 11111011
 	}
+
+	this.dirty = true
 }
 
 // WillQos returns the two bits that specify the QoS level to be used when publishing
@@ -148,6 +154,8 @@ func (this *ConnectMessage) SetWillQos(qos byte) error {
 	}
 
 	this.connectFlags = (this.connectFlags & 231) | (qos << 3) // 231 = 11100111
+	this.dirty = true
+
 	return nil
 }
 
@@ -165,6 +173,8 @@ func (this *ConnectMessage) SetWillRetain(v bool) {
 	} else {
 		this.connectFlags &= 223 // 11011111
 	}
+
+	this.dirty = true
 }
 
 // UsernameFlag returns the bit that specifies whether a user name is present in the
@@ -181,6 +191,8 @@ func (this *ConnectMessage) SetUsernameFlag(v bool) {
 	} else {
 		this.connectFlags &= 127 // 01111111
 	}
+
+	this.dirty = true
 }
 
 // PasswordFlag returns the bit that specifies whether a password is present in the
@@ -197,6 +209,8 @@ func (this *ConnectMessage) SetPasswordFlag(v bool) {
 	} else {
 		this.connectFlags &= 191 // 10111111
 	}
+
+	this.dirty = true
 }
 
 // KeepAlive returns a time interval measured in seconds. Expressed as a 16-bit word,
@@ -211,6 +225,8 @@ func (this *ConnectMessage) KeepAlive() uint16 {
 // alive.
 func (this *ConnectMessage) SetKeepAlive(v uint16) {
 	this.keepAlive = v
+
+	this.dirty = true
 }
 
 // ClientId returns an ID that identifies the Client to the Server. Each Client
@@ -228,6 +244,8 @@ func (this *ConnectMessage) SetClientId(v []byte) error {
 	}
 
 	this.clientId = v
+	this.dirty = true
+
 	return nil
 }
 
@@ -246,6 +264,8 @@ func (this *ConnectMessage) SetWillTopic(v []byte) {
 	} else if len(this.willMessage) == 0 {
 		this.SetWillFlag(false)
 	}
+
+	this.dirty = true
 }
 
 // WillMessage returns the Will Message that is to be published to the Will Topic.
@@ -262,6 +282,8 @@ func (this *ConnectMessage) SetWillMessage(v []byte) {
 	} else if len(this.willTopic) == 0 {
 		this.SetWillFlag(false)
 	}
+
+	this.dirty = true
 }
 
 // Username returns the username from the payload. If the User Name Flag is set to 1,
@@ -280,6 +302,8 @@ func (this *ConnectMessage) SetUsername(v []byte) {
 	} else {
 		this.SetUsernameFlag(false)
 	}
+
+	this.dirty = true
 }
 
 // Password returns the password from the payload. If the Password Flag is set to 1,
@@ -298,9 +322,15 @@ func (this *ConnectMessage) SetPassword(v []byte) {
 	} else {
 		this.SetPasswordFlag(false)
 	}
+
+	this.dirty = true
 }
 
 func (this *ConnectMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
 	ml := this.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -331,10 +361,20 @@ func (this *ConnectMessage) Decode(src []byte) (int, error) {
 	}
 	total += n
 
+	this.dirty = false
+
 	return total, nil
 }
 
 func (this *ConnectMessage) Encode(dst []byte) (int, error) {
+	if !this.dirty {
+		if len(dst) < len(this.dbuf) {
+			return 0, fmt.Errorf("connect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+		}
+
+		return copy(dst, this.dbuf), nil
+	}
+
 	if this.Type() != CONNECT {
 		return 0, fmt.Errorf("connect/Encode: Invalid message type. Expecting %d, got %d", CONNECT, this.Type())
 	}
@@ -529,12 +569,6 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 			return total, err
 		}
 	}
-
-	/*
-		if len(src[total:]) > 0 {
-			return total, fmt.Errorf("connect/decodeMessage: Invalid buffer size. Still has %d bytes at the end.", len(src[total:]))
-		}
-	*/
 
 	return total, nil
 }

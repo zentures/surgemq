@@ -18,12 +18,11 @@ import (
 	"testing"
 
 	"github.com/dataence/assert"
-	"github.com/dataence/glog"
 )
 
 func TestPublishMessageHeaderFields(t *testing.T) {
 	msg := NewPublishMessage()
-	msg.flags = 11
+	msg.mtypeflags[0] |= 11
 
 	assert.True(t, true, msg.Dup(), "Incorrect DUP flag.")
 	assert.True(t, true, msg.Retain(), "Incorrect RETAIN flag.")
@@ -213,8 +212,6 @@ func TestPublishMessageEncode4(t *testing.T) {
 
 	payload := make([]byte, 1024)
 	msgBytes = append(msgBytes, payload...)
-
-	glog.Debugf("msgBytes len = %d", len(msgBytes))
 
 	msg := NewPublishMessage()
 	msg.SetTopic([]byte("surgemq"))

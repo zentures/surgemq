@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package session
+package sessions
 
 import (
 	"errors"
@@ -25,8 +25,8 @@ var (
 )
 
 var (
-	_ SessionProvider = (*memProvider)(nil)
-	_ Session         = (*memSession)(nil)
+	_ SessionsProvider = (*memProvider)(nil)
+	_ Session          = (*memSession)(nil)
 )
 
 type memSession struct {
@@ -37,6 +37,10 @@ type memSession struct {
 
 func init() {
 	Register("mem", NewMemProvider())
+}
+
+func NewMemSession(id string) *memSession {
+	return &memSession{id: id, values: make(map[interface{}]interface{})}
 }
 
 func (this *memSession) Set(key, value interface{}) error {
@@ -86,9 +90,8 @@ func (this *memProvider) New(id string) (Session, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
-	sess := &memSession{id: id, values: make(map[interface{}]interface{})}
-	this.st[id] = sess
-	return sess, nil
+	this.st[id] = NewMemSession(id)
+	return this.st[id], nil
 }
 
 func (this *memProvider) Get(id string) (Session, error) {
