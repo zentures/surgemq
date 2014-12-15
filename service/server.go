@@ -65,7 +65,7 @@ type Server struct {
 	TimeoutRetries int
 
 	// Authenticator is the authenticator used to check username and password sent
-	// in the CONNECT message. If not set then default to "mem".
+	// in the CONNECT message. If not set then default to "mockSuccess".
 	Authenticator string
 
 	// SessionsProvider is the session store that keeps all the Session objects.
