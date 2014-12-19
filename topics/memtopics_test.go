@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/dataence/assert"
+	"github.com/surge/surgemq/message"
 )
 
 func TestNextTopicLevelSuccess(t *testing.T) {
@@ -91,198 +92,198 @@ func TestNextTopicLevelFailure(t *testing.T) {
 	assert.Error(t, true, err)
 }
 
-func TestNodeInsert1(t *testing.T) {
-	n := newNode()
+func TestSNodeInsert1(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
 
-	err := n.insert(topic, 1, "sub1")
+	err := n.sinsert(topic, 1, "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(n.nodes))
+	assert.Equal(t, true, 1, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 
-	n2, ok := n.nodes["sport"]
+	n2, ok := n.snodes["sport"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n2.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n2.snodes))
 	assert.Equal(t, true, 0, len(n2.subs))
 
-	n3, ok := n2.nodes["tennis"]
+	n3, ok := n2.snodes["tennis"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n3.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n3.snodes))
 	assert.Equal(t, true, 0, len(n3.subs))
 
-	n4, ok := n3.nodes["player1"]
+	n4, ok := n3.snodes["player1"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n4.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n4.snodes))
 	assert.Equal(t, true, 0, len(n4.subs))
 
-	n5, ok := n4.nodes["#"]
+	n5, ok := n4.snodes["#"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 0, len(n5.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n5.snodes))
 	assert.Equal(t, true, 1, len(n5.subs))
 	assert.Equal(t, true, "sub1", n5.subs[0].(string))
 }
 
-func TestNodeInsert2(t *testing.T) {
-	n := newNode()
+func TestSNodeInsert2(t *testing.T) {
+	n := newSNode()
 	topic := []byte("#")
 
-	err := n.insert(topic, 1, "sub1")
+	err := n.sinsert(topic, 1, "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(n.nodes))
+	assert.Equal(t, true, 1, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 
-	n2, ok := n.nodes["#"]
+	n2, ok := n.snodes["#"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 0, len(n2.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n2.snodes))
 	assert.Equal(t, true, 1, len(n2.subs))
 	assert.Equal(t, true, "sub1", n2.subs[0].(string))
 }
 
-func TestNodeInsert3(t *testing.T) {
-	n := newNode()
+func TestSNodeInsert3(t *testing.T) {
+	n := newSNode()
 	topic := []byte("+/tennis/#")
 
-	err := n.insert(topic, 1, "sub1")
+	err := n.sinsert(topic, 1, "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(n.nodes))
+	assert.Equal(t, true, 1, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 
-	n2, ok := n.nodes["+"]
+	n2, ok := n.snodes["+"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n2.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n2.snodes))
 	assert.Equal(t, true, 0, len(n2.subs))
 
-	n3, ok := n2.nodes["tennis"]
+	n3, ok := n2.snodes["tennis"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n3.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n3.snodes))
 	assert.Equal(t, true, 0, len(n3.subs))
 
-	n4, ok := n3.nodes["#"]
+	n4, ok := n3.snodes["#"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 0, len(n4.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n4.snodes))
 	assert.Equal(t, true, 1, len(n4.subs))
 	assert.Equal(t, true, "sub1", n4.subs[0].(string))
 }
 
-func TestNodeInsert4(t *testing.T) {
-	n := newNode()
+func TestSNodeInsert4(t *testing.T) {
+	n := newSNode()
 	topic := []byte("/finance")
 
-	err := n.insert(topic, 1, "sub1")
+	err := n.sinsert(topic, 1, "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(n.nodes))
+	assert.Equal(t, true, 1, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 
-	n2, ok := n.nodes["+"]
+	n2, ok := n.snodes["+"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n2.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n2.snodes))
 	assert.Equal(t, true, 0, len(n2.subs))
 
-	n3, ok := n2.nodes["finance"]
+	n3, ok := n2.snodes["finance"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 0, len(n3.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n3.snodes))
 	assert.Equal(t, true, 1, len(n3.subs))
 	assert.Equal(t, true, "sub1", n3.subs[0].(string))
 }
 
-func TestNodeInsertDup(t *testing.T) {
-	n := newNode()
+func TestSNodeInsertDup(t *testing.T) {
+	n := newSNode()
 	topic := []byte("/finance")
 
-	err := n.insert(topic, 1, "sub1")
-	err = n.insert(topic, 1, "sub1")
+	err := n.sinsert(topic, 1, "sub1")
+	err = n.sinsert(topic, 1, "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(n.nodes))
+	assert.Equal(t, true, 1, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 
-	n2, ok := n.nodes["+"]
+	n2, ok := n.snodes["+"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 1, len(n2.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n2.snodes))
 	assert.Equal(t, true, 0, len(n2.subs))
 
-	n3, ok := n2.nodes["finance"]
+	n3, ok := n2.snodes["finance"]
 
-	assert.Equal(t, true, true, ok)
-	assert.Equal(t, true, 0, len(n3.nodes))
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n3.snodes))
 	assert.Equal(t, true, 1, len(n3.subs))
 	assert.Equal(t, true, "sub1", n3.subs[0].(string))
 }
 
-func TestNodeRemove1(t *testing.T) {
-	n := newNode()
+func TestSNodeRemove1(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
 
-	n.insert(topic, 1, "sub1")
-	err := n.remove([]byte("sport/tennis/player1/#"), "sub1")
+	n.sinsert(topic, 1, "sub1")
+	err := n.sremove([]byte("sport/tennis/player1/#"), "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 0, len(n.nodes))
+	assert.Equal(t, true, 0, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 }
 
-func TestNodeRemove2(t *testing.T) {
-	n := newNode()
+func TestSNodeRemove2(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
 
-	n.insert(topic, 1, "sub1")
-	err := n.remove([]byte("sport/tennis/player1"), "sub1")
+	n.sinsert(topic, 1, "sub1")
+	err := n.sremove([]byte("sport/tennis/player1"), "sub1")
 
 	assert.Error(t, true, err)
 }
 
-func TestNodeRemove3(t *testing.T) {
-	n := newNode()
+func TestSNodeRemove3(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
 
-	n.insert(topic, 1, "sub1")
-	n.insert(topic, 1, "sub2")
-	err := n.remove([]byte("sport/tennis/player1/#"), nil)
+	n.sinsert(topic, 1, "sub1")
+	n.sinsert(topic, 1, "sub2")
+	err := n.sremove([]byte("sport/tennis/player1/#"), nil)
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 0, len(n.nodes))
+	assert.Equal(t, true, 0, len(n.snodes))
 	assert.Equal(t, true, 0, len(n.subs))
 }
 
-func TestNodeMatch1(t *testing.T) {
-	n := newNode()
+func TestSNodeMatch1(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
-	n.insert(topic, 1, "sub1")
+	n.sinsert(topic, 1, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
+	err := n.smatch([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 	assert.Equal(t, true, 1, qoss[0])
 }
 
-func TestNodeMatch2(t *testing.T) {
-	n := newNode()
+func TestSNodeMatch2(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
-	n.insert(topic, 1, "sub1")
+	n.sinsert(topic, 1, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
+	err := n.smatch([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
@@ -290,104 +291,245 @@ func TestNodeMatch2(t *testing.T) {
 
 }
 
-func TestNodeMatch3(t *testing.T) {
-	n := newNode()
+func TestSNodeMatch3(t *testing.T) {
+	n := newSNode()
 	topic := []byte("sport/tennis/player1/#")
-	n.insert(topic, 2, "sub1")
+	n.sinsert(topic, 2, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
+	err := n.smatch([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 	assert.Equal(t, true, 2, qoss[0])
 }
 
-func TestNodeMatch4(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("sport/tennis/#"), 2, "sub1")
+func TestSNodeMatch4(t *testing.T) {
+	n := newSNode()
+	n.sinsert([]byte("sport/tennis/#"), 2, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
+	err := n.smatch([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 	assert.Equal(t, true, 2, qoss[0])
 }
 
-func TestNodeMatch5(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("sport/tennis/+/anzel"), 1, "sub1")
-	n.insert([]byte("sport/tennis/player1/anzel"), 1, "sub2")
+func TestSNodeMatch5(t *testing.T) {
+	n := newSNode()
+	n.sinsert([]byte("sport/tennis/+/anzel"), 1, "sub1")
+	n.sinsert([]byte("sport/tennis/player1/anzel"), 1, "sub2")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
+	err := n.smatch([]byte("sport/tennis/player1/anzel"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 2, len(subs))
 }
 
-func TestNodeMatch6(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("sport/tennis/#"), 2, "sub1")
-	n.insert([]byte("sport/tennis"), 1, "sub2")
+func TestSNodeMatch6(t *testing.T) {
+	n := newSNode()
+	n.sinsert([]byte("sport/tennis/#"), 2, "sub1")
+	n.sinsert([]byte("sport/tennis"), 1, "sub2")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
+	err := n.smatch([]byte("sport/tennis/player1/anzel"), 2, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 	assert.Equal(t, true, "sub1", subs[0])
 }
 
-func TestNodeMatch7(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("+/+"), 2, "sub1")
+func TestSNodeMatch7(t *testing.T) {
+	n := newSNode()
+	n.sinsert([]byte("+/+"), 2, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("/finance"), 1, &subs, &qoss)
+	err := n.smatch([]byte("/finance"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 }
 
-func TestNodeMatch8(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("/+"), 2, "sub1")
+func TestSNodeMatch8(t *testing.T) {
+	n := newSNode()
+	n.sinsert([]byte("/+"), 2, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("/finance"), 1, &subs, &qoss)
+	err := n.smatch([]byte("/finance"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
 }
 
-func TestNodeMatch9(t *testing.T) {
-	n := newNode()
-	n.insert([]byte("+"), 2, "sub1")
+func TestSNodeMatch9(t *testing.T) {
+	n := newSNode()
+	n.sinsert([]byte("+"), 2, "sub1")
 
 	subs := make([]interface{}, 0, 5)
 	qoss := make([]byte, 0, 5)
 
-	err := n.match([]byte("/finance"), 1, &subs, &qoss)
+	err := n.smatch([]byte("/finance"), 1, &subs, &qoss)
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 0, len(subs))
 }
 
-func TestMemTopics(t *testing.T) {
+func TestRNodeInsertRemove(t *testing.T) {
+	n := newRNode()
+
+	// --- Insert msg1
+
+	msg := newPublishMessageLarge([]byte("sport/tennis/player1/ricardo"), 1)
+
+	err := n.rinsert(msg.Topic(), msg)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(n.rnodes))
+	assert.Nil(t, true, n.msg)
+
+	n2, ok := n.rnodes["sport"]
+
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n2.rnodes))
+	assert.Nil(t, true, n2.msg)
+
+	n3, ok := n2.rnodes["tennis"]
+
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n3.rnodes))
+	assert.Nil(t, true, n3.msg)
+
+	n4, ok := n3.rnodes["player1"]
+
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 1, len(n4.rnodes))
+	assert.Nil(t, true, n4.msg)
+
+	n5, ok := n4.rnodes["ricardo"]
+
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n5.rnodes))
+	assert.NotNil(t, true, n5.msg)
+	assert.Equal(t, true, msg.QoS(), n5.msg.QoS())
+	assert.Equal(t, true, msg.Topic(), n5.msg.Topic())
+	assert.Equal(t, true, msg.Payload(), n5.msg.Payload())
+
+	// --- Insert msg2
+
+	msg2 := newPublishMessageLarge([]byte("sport/tennis/player1/andre"), 1)
+
+	err = n.rinsert(msg2.Topic(), msg2)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(n4.rnodes))
+
+	n6, ok := n4.rnodes["andre"]
+
+	assert.True(t, true, ok)
+	assert.Equal(t, true, 0, len(n6.rnodes))
+	assert.NotNil(t, true, n6.msg)
+	assert.Equal(t, true, msg2.QoS(), n6.msg.QoS())
+	assert.Equal(t, true, msg2.Topic(), n6.msg.Topic())
+
+	// --- Remove
+
+	err = n.rremove([]byte("sport/tennis/player1/andre"))
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(n4.rnodes))
+}
+
+func TestRNodeMatch(t *testing.T) {
+	n := newRNode()
+
+	msg1 := newPublishMessageLarge([]byte("sport/tennis/ricardo/stats"), 1)
+	err := n.rinsert(msg1.Topic(), msg1)
+	assert.NoError(t, true, err)
+
+	msg2 := newPublishMessageLarge([]byte("sport/tennis/andre/stats"), 1)
+	err = n.rinsert(msg2.Topic(), msg2)
+	assert.NoError(t, true, err)
+
+	msg3 := newPublishMessageLarge([]byte("sport/tennis/andre/bio"), 1)
+	err = n.rinsert(msg3.Topic(), msg3)
+	assert.NoError(t, true, err)
+
+	msglist := make([]*message.PublishMessage, 0)
+
+	// ---
+
+	err = n.rmatch(msg1.Topic(), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = n.rmatch(msg2.Topic(), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = n.rmatch(msg3.Topic(), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = n.rmatch([]byte("sport/tennis/andre/+"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = n.rmatch([]byte("sport/tennis/andre/#"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = n.rmatch([]byte("sport/tennis/+/stats"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = n.rmatch([]byte("sport/tennis/#"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 3, len(msglist))
+}
+
+func TestMemTopicsSubscription(t *testing.T) {
+	Unregister("mem")
+	p := NewMemProvider()
+	Register("mem", p)
+
 	mgr, err := NewManager("mem")
 
 	MaxQosAllowed = 1
@@ -417,4 +559,92 @@ func TestMemTopics(t *testing.T) {
 	err = mgr.Unsubscribe([]byte("sports/tennis/+/stats"), "sub1")
 
 	assert.NoError(t, true, err)
+}
+
+func TestMemTopicsRetained(t *testing.T) {
+	Unregister("mem")
+	p := NewMemProvider()
+	Register("mem", p)
+
+	mgr, err := NewManager("mem")
+	assert.NoError(t, true, err)
+	assert.NotNil(t, true, mgr)
+
+	msg1 := newPublishMessageLarge([]byte("sport/tennis/ricardo/stats"), 1)
+	err = mgr.Retain(msg1)
+	assert.NoError(t, true, err)
+
+	msg2 := newPublishMessageLarge([]byte("sport/tennis/andre/stats"), 1)
+	err = mgr.Retain(msg2)
+	assert.NoError(t, true, err)
+
+	msg3 := newPublishMessageLarge([]byte("sport/tennis/andre/bio"), 1)
+	err = mgr.Retain(msg3)
+	assert.NoError(t, true, err)
+
+	msglist := make([]*message.PublishMessage, 0)
+
+	// ---
+
+	err = mgr.Retained(msg1.Topic(), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = mgr.Retained(msg2.Topic(), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = mgr.Retained(msg3.Topic(), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 1, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = mgr.Retained([]byte("sport/tennis/andre/+"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = mgr.Retained([]byte("sport/tennis/andre/#"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = mgr.Retained([]byte("sport/tennis/+/stats"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 2, len(msglist))
+
+	// ---
+
+	msglist = msglist[0:0]
+	err = mgr.Retained([]byte("sport/tennis/#"), &msglist)
+
+	assert.NoError(t, true, err)
+	assert.Equal(t, true, 3, len(msglist))
+}
+
+func newPublishMessageLarge(topic []byte, qos byte) *message.PublishMessage {
+	msg := message.NewPublishMessage()
+	msg.SetTopic(topic)
+	msg.SetPayload(make([]byte, 1024))
+	msg.SetQoS(qos)
+
+	return msg
 }

@@ -15,86 +15,36 @@
 package sessions
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 )
 
-var (
-	ErrKeyNotAvailable error = errors.New("Session: not item found for key.")
-)
-
-var (
-	_ SessionsProvider = (*memProvider)(nil)
-	_ Session          = (*memSession)(nil)
-)
-
-type memSession struct {
-	id     string
-	mu     sync.RWMutex
-	values map[interface{}]interface{}
-}
+var _ SessionsProvider = (*memProvider)(nil)
 
 func init() {
 	Register("mem", NewMemProvider())
 }
 
-func NewMemSession(id string) *memSession {
-	return &memSession{id: id, values: make(map[interface{}]interface{})}
-}
-
-func (this *memSession) Set(key, value interface{}) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-
-	this.values[key] = value
-	return nil
-}
-
-func (this *memSession) Get(key interface{}) (interface{}, error) {
-	this.mu.RLock()
-	defer this.mu.RUnlock()
-
-	v, ok := this.values[key]
-	if !ok {
-		return nil, ErrKeyNotAvailable
-	}
-
-	return v, nil
-}
-
-func (this *memSession) Del(key interface{}) {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	delete(this.values, key)
-}
-
-func (this *memSession) ID() string {
-	return this.id
-}
-
-// **** Below are memProvider methods ***** //
-
 type memProvider struct {
-	st map[string]Session
+	st map[string]*Session
 	mu sync.RWMutex
 }
 
 func NewMemProvider() *memProvider {
 	return &memProvider{
-		st: make(map[string]Session),
+		st: make(map[string]*Session),
 	}
 }
 
-func (this *memProvider) New(id string) (Session, error) {
+func (this *memProvider) New(id string) (*Session, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
-	this.st[id] = NewMemSession(id)
+	this.st[id] = &Session{id: id}
 	return this.st[id], nil
 }
 
-func (this *memProvider) Get(id string) (Session, error) {
+func (this *memProvider) Get(id string) (*Session, error) {
 	this.mu.RLock()
 	defer this.mu.RUnlock()
 
@@ -118,4 +68,9 @@ func (this *memProvider) Save(id string) error {
 
 func (this *memProvider) Count() int {
 	return len(this.st)
+}
+
+func (this *memProvider) Close() error {
+	this.st = make(map[string]*Session)
+	return nil
 }

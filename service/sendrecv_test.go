@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/dataence/assert"
 	"github.com/surge/surgemq/message"
@@ -143,20 +142,10 @@ func TestReadMessageError2(t *testing.T) {
 	}
 
 	svc := newTestBuffer(t, msgBytes)
-	quit := make(chan struct{})
 
-	go func() {
-		svc.readMessage(message.CONNECT, 64)
-		// should never reach here as readMessage would never exit
-		close(quit)
-	}()
+	_, _, err := svc.readMessage(message.CONNECT, 64)
 
-	select {
-	case <-quit:
-		assert.Fail(t, true, "Should not reach quit")
-
-	case <-time.After(time.Millisecond * 10):
-	}
+	assert.Equal(t, true, io.EOF, err)
 }
 
 func TestWriteMessage(t *testing.T) {
@@ -188,6 +177,7 @@ func TestWriteMessage(t *testing.T) {
 	}
 
 	msg := newConnectMessage()
+	msg.SetClientId([]byte("surgemq"))
 	var err error
 
 	svc := &service{}

@@ -17,15 +17,22 @@ package service
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dataence/assert"
+	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/sessions"
 	"github.com/surge/surgemq/topics"
+)
+
+var (
+	gTestClientId uint64 = 0
 )
 
 func runClientServerTests(t testing.TB, f func(*Client)) {
@@ -49,7 +56,7 @@ func runClientServerTests(t testing.TB, f func(*Client)) {
 		return
 	}
 
-	defer topics.Unregister(c.svc.cid)
+	defer topics.Unregister(c.svc.sess.ID())
 
 	if f != nil {
 		f(c)
@@ -62,7 +69,7 @@ func runClientServerTests(t testing.TB, f func(*Client)) {
 	wg.Wait()
 }
 
-func startService(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 chan struct{}) {
+func startServiceN(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 chan struct{}, cnt int) {
 	defer wg.Done()
 
 	topics.Unregister("mem")
@@ -73,39 +80,40 @@ func startService(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 c
 	sp := sessions.NewMemProvider()
 	sessions.Register("mem", sp)
 
-	conn := listenAndConnect(t, u, ready1)
+	ln, err := net.Listen(u.Scheme, u.Host)
+	assert.NoError(t, true, err)
+	defer ln.Close()
+
+	close(ready1)
 
 	svr := &Server{
 		Authenticator: authenticator,
 	}
 
-	svc, err := svr.handleConnection(conn)
-	defer func() {
-		if svc != nil {
-			svc.stop()
-		}
-	}()
-	if authenticator == "mockFailure" {
-		assert.Error(t, true, err)
-		return
-	} else {
+	for i := 0; i < cnt; i++ {
+		conn, err := ln.Accept()
 		assert.NoError(t, true, err)
+
+		_, err = svr.handleConnection(conn)
+		if authenticator == "mockFailure" {
+			assert.Error(t, true, err)
+			return
+		} else {
+			assert.NoError(t, true, err)
+		}
 	}
 
 	<-ready2
+
+	for _, svc := range svr.svcs {
+		glog.Infof("Stopping service %d", svc.id)
+		svc.stop()
+	}
+
 }
 
-func listenAndConnect(t testing.TB, u *url.URL, ready chan struct{}) net.Conn {
-	ln, err := net.Listen(u.Scheme, u.Host)
-	assert.NoError(t, true, err)
-	defer ln.Close()
-
-	close(ready)
-
-	conn, err := ln.Accept()
-	assert.NoError(t, true, err)
-
-	return conn
+func startService(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 chan struct{}) {
+	startServiceN(t, u, wg, ready1, ready2, 1)
 }
 
 func connectToServer(t testing.TB, uri string) *Client {
@@ -153,7 +161,6 @@ func newPublishMessageLarge(pktid uint16, qos byte) *message.PublishMessage {
 
 func newSubscribeMessage(qos byte) *message.SubscribeMessage {
 	msg := message.NewSubscribeMessage()
-	msg.SetPacketId(1)
 	msg.AddTopic([]byte("abc"), qos)
 
 	return msg
@@ -161,7 +168,6 @@ func newSubscribeMessage(qos byte) *message.SubscribeMessage {
 
 func newUnsubscribeMessage() *message.UnsubscribeMessage {
 	msg := message.NewUnsubscribeMessage()
-	msg.SetPacketId(1)
 	msg.AddTopic([]byte("abc"))
 
 	return msg
@@ -172,7 +178,7 @@ func newConnectMessage() *message.ConnectMessage {
 	msg.SetWillQos(1)
 	msg.SetVersion(4)
 	msg.SetCleanSession(true)
-	msg.SetClientId([]byte("surgemq"))
+	msg.SetClientId([]byte(fmt.Sprintf("surgemq%d", atomic.AddUint64(&gTestClientId, 1))))
 	msg.SetKeepAlive(10)
 	msg.SetWillTopic([]byte("will"))
 	msg.SetWillMessage([]byte("send me home"))

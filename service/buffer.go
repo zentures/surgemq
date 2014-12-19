@@ -20,6 +20,8 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dataence/glog"
 )
 
 var (
@@ -86,7 +88,7 @@ func newBuffer(size int64) (*buffer, error) {
 	}
 
 	if !powerOfTwo64(size) {
-		return nil, fmt.Errorf("Size must be power of two. Try %d.", roundUppowerOfTwo64(size))
+		return nil, fmt.Errorf("Size must be power of two. Try %d.", roundUpPowerOfTwo64(size))
 	}
 
 	if size < 2*defaultReadBlockSize {
@@ -113,8 +115,15 @@ func (this *buffer) ID() int32 {
 
 func (this *buffer) Close() error {
 	atomic.StoreInt64(&this.done, 1)
-	this.ccond.Broadcast()
+
+	this.pcond.L.Lock()
 	this.pcond.Broadcast()
+	this.pcond.L.Unlock()
+
+	this.pcond.L.Lock()
+	this.ccond.Broadcast()
+	this.pcond.L.Unlock()
+
 	return nil
 }
 
@@ -125,9 +134,15 @@ func (this *buffer) Len() int {
 }
 
 func (this *buffer) ReadFrom(r io.Reader) (int64, error) {
+	defer this.Close()
+
 	total := int64(0)
 
 	for {
+		if this.isDone() {
+			return total, io.EOF
+		}
+
 		start, cnt, err := this.waitForWriteSpace(defaultReadBlockSize)
 		if err != nil {
 			return 0, err
@@ -158,15 +173,22 @@ func (this *buffer) ReadFrom(r io.Reader) (int64, error) {
 }
 
 func (this *buffer) WriteTo(w io.Writer) (int64, error) {
+	defer this.Close()
+
 	total := int64(0)
 
 	for {
+		if this.isDone() {
+			return total, io.EOF
+		}
+
 		p, err := this.ReadPeek(defaultWriteBlockSize)
 
 		// There's some data, let's process it first
 		if len(p) > 0 {
 			n, err := w.Write(p)
 			total += int64(n)
+			//glog.Debugf("Wrote %d bytes, totaling %d bytes", n, total)
 
 			if err != nil {
 				return total, err
@@ -187,7 +209,8 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (this *buffer) Read(p []byte) (int, error) {
-	if atomic.LoadInt64(&this.done) == 1 {
+	if this.isDone() && this.Len() == 0 {
+		glog.Debugf("isDone and len = %d", this.Len())
 		return 0, io.EOF
 	}
 
@@ -249,14 +272,14 @@ func (this *buffer) Read(p []byte) (int, error) {
 		// If we got here, that means cpos >= ppos, which means there's no data available.
 		// If so, let's wait...
 
-		this.cwait++
 		this.ccond.L.Lock()
 		for ppos = this.pseq.get(); cpos >= ppos; ppos = this.pseq.get() {
-			this.ccond.Wait()
-
-			if atomic.LoadInt64(&this.done) == 1 {
+			if this.isDone() {
 				return 0, io.EOF
 			}
+
+			this.cwait++
+			this.ccond.Wait()
 		}
 		this.ccond.L.Unlock()
 	}
@@ -265,6 +288,10 @@ func (this *buffer) Read(p []byte) (int, error) {
 }
 
 func (this *buffer) Write(p []byte) (int, error) {
+	if this.isDone() {
+		return 0, io.EOF
+	}
+
 	start, _, err := this.waitForWriteSpace(len(p))
 	if err != nil {
 		return 0, err
@@ -291,10 +318,6 @@ func (this *buffer) Write(p []byte) (int, error) {
 // If there's not enough data to peek, error is ErrBufferInsufficientData.
 // If n < 0, error is bufio.ErrNegativeCount
 func (this *buffer) ReadPeek(n int) ([]byte, error) {
-	if atomic.LoadInt64(&this.done) == 1 {
-		return nil, io.EOF
-	}
-
 	if int64(n) > this.size {
 		return nil, bufio.ErrBufferFull
 	}
@@ -308,13 +331,13 @@ func (this *buffer) ReadPeek(n int) ([]byte, error) {
 
 	// If there's no data, then let's wait until there is some data
 	this.ccond.L.Lock()
-	this.cwait++
 	for ; cpos >= ppos; ppos = this.pseq.get() {
-		this.ccond.Wait()
-
-		if atomic.LoadInt64(&this.done) == 1 {
+		if this.isDone() {
 			return nil, io.EOF
 		}
+
+		this.cwait++
+		this.ccond.Wait()
 	}
 	this.ccond.L.Unlock()
 
@@ -352,13 +375,9 @@ func (this *buffer) ReadPeek(n int) ([]byte, error) {
 }
 
 // Wait waits for for n bytes to be ready. If there's not enough data, then it will
-// wait until there's enough. This differs from Peek in that Peek will return whatever
-// is available and won't wait for full count.
+// wait until there's enough. This differs from ReadPeek or Readin that Peek will
+// return whatever is available and won't wait for full count.
 func (this *buffer) ReadWait(n int) ([]byte, error) {
-	if atomic.LoadInt64(&this.done) == 1 {
-		return nil, io.EOF
-	}
-
 	if int64(n) > this.size {
 		return nil, bufio.ErrBufferFull
 	}
@@ -377,11 +396,11 @@ func (this *buffer) ReadWait(n int) ([]byte, error) {
 	// If there's no data, then let's wait until there is some data
 	this.ccond.L.Lock()
 	for ; next > ppos; ppos = this.pseq.get() {
-		this.ccond.Wait()
-
-		if atomic.LoadInt64(&this.done) == 1 {
+		if this.isDone() {
 			return nil, io.EOF
 		}
+
+		this.ccond.Wait()
 	}
 	this.ccond.L.Unlock()
 
@@ -474,7 +493,7 @@ func (this *buffer) WriteCommit(n int) (int, error) {
 }
 
 func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
-	if atomic.LoadInt64(&this.done) == 1 {
+	if this.isDone() {
 		return 0, 0, io.EOF
 	}
 
@@ -531,12 +550,12 @@ func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
 		var cpos int64
 		this.pcond.L.Lock()
 		for cpos = this.cseq.get(); wrap > cpos; cpos = this.cseq.get() {
-			this.pwait++
-			this.pcond.Wait()
-
-			if atomic.LoadInt64(&this.done) == 1 {
+			if this.isDone() {
 				return 0, 0, io.EOF
 			}
+
+			this.pwait++
+			this.pcond.Wait()
 		}
 
 		this.pseq.gate = cpos
@@ -544,6 +563,14 @@ func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
 	}
 
 	return ppos, n, nil
+}
+
+func (this *buffer) isDone() bool {
+	if atomic.LoadInt64(&this.done) == 1 {
+		return true
+	}
+
+	return false
 }
 
 func ringCopy(dst, src []byte, start int64) int {
@@ -562,4 +589,21 @@ func ringCopy(dst, src []byte, start int64) int {
 	}
 
 	return i
+}
+
+func powerOfTwo64(n int64) bool {
+	return n != 0 && (n&(n-1)) == 0
+}
+
+func roundUpPowerOfTwo64(n int64) int64 {
+	n--
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	n |= n >> 32
+	n++
+
+	return n
 }

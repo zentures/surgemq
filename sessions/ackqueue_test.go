@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package sessions
 
 import (
 	"testing"
@@ -27,24 +27,24 @@ func TestAckQueueOutOfOrder(t *testing.T) {
 
 	for i := 0; i < 12; i++ {
 		msg := newPublishMessage(uint16(i), 1)
-		q.wait(msg, nil)
+		q.Wait(msg, nil)
 	}
 
 	assert.Equal(t, true, 12, q.len())
 
 	ack1 := message.NewPubackMessage()
 	ack1.SetPacketId(1)
-	q.ack(ack1)
+	q.Ack(ack1)
 
-	acked := q.acked()
+	acked := q.Acked()
 
 	assert.Equal(t, true, 0, len(acked))
 
 	ack0 := message.NewPubackMessage()
 	ack0.SetPacketId(0)
-	q.ack(ack0)
+	q.Ack(ack0)
 
-	acked = q.acked()
+	acked = q.Acked()
 
 	assert.Equal(t, true, 2, len(acked))
 }

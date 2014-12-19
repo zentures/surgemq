@@ -26,60 +26,61 @@ import (
 	"github.com/surge/surgemq/message"
 )
 
+// receiver() reads data from the network, and writes the data into the incoming buffer
 func (this *service) receiver() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
+			glog.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
-		this.stop()
 
-		glog.Debugf("(%s) Stopping receiver", this.cid)
+		glog.Debugf("(%s) Stopping receiver", this.cid())
 	}()
 
-	glog.Debugf("(%s) Starting receiver", this.cid)
+	glog.Debugf("(%s) Starting receiver", this.cid())
 
 	this.wgStarted.Done()
 
 	switch conn := this.conn.(type) {
 	case net.Conn:
+		//glog.Debugf("server/handleConnection: Setting read deadline to %d", time.Second*time.Duration(this.keepAlive))
 		conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.keepAlive)))
 
 		for {
 			_, err := this.in.ReadFrom(conn)
 
 			if err != nil {
-				if !this.isDone() {
-					glog.Errorf("(%d/%s) error reading from connection: %v", this.id, this.cid, err)
+				if err != io.EOF {
+					glog.Errorf("(%s) error reading from connection: %v", this.cid(), err)
 				}
 				return
 			}
 		}
 
 	case *websocket.Conn:
-		glog.Errorf("(%s) Websocket: %v", this.cid, ErrInvalidConnectionType)
+		glog.Errorf("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
 
 	default:
-		glog.Errorf("(%s) %v", this.cid, ErrInvalidConnectionType)
+		glog.Errorf("(%s) %v", this.cid(), ErrInvalidConnectionType)
 	}
 }
 
+// sender() writes data from the outgoing buffer to the network
 func (this *service) sender() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			glog.Errorf("(%d/%s) Recovering from panic: %v", this.id, this.cid, r)
+			glog.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
-		this.stop()
 
-		glog.Debugf("(%s) Stopping sender", this.cid)
+		glog.Debugf("(%s) Stopping sender", this.cid())
 	}()
 
-	glog.Debugf("(%s) Starting sender", this.cid)
+	glog.Debugf("(%s) Starting sender", this.cid())
 
 	this.wgStarted.Done()
 
@@ -90,20 +91,22 @@ func (this *service) sender() {
 
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%s) error writing data: %v", this.cid, err)
+					glog.Errorf("(%s) error writing data: %v", this.cid(), err)
 				}
 				return
 			}
 		}
 
 	case *websocket.Conn:
-		glog.Errorf("(%s) Websocket not supported", this.cid)
+		glog.Errorf("(%s) Websocket not supported", this.cid())
 
 	default:
-		glog.Errorf("(%s) Invalid connection type", this.cid)
+		glog.Errorf("(%s) Invalid connection type", this.cid())
 	}
 }
 
+// peekMessageSize() reads, but not commits, enough bytes to determine the size of
+// the next message and returns the type and size.
 func (this *service) peekMessageSize() (message.MessageType, int, error) {
 	var (
 		b   []byte
@@ -151,11 +154,11 @@ func (this *service) peekMessageSize() (message.MessageType, int, error) {
 
 	mtype := message.MessageType(b[0] >> 4)
 
-	//qos := ((b[0] & 0x0f) >> 1) & 0x3
-
 	return mtype, total, err
 }
 
+// peekMessage() reads a message from the buffer, but the bytes are NOT committed.
+// This means the buffer still thinks the bytes are not read yet.
 func (this *service) peekMessage(mtype message.MessageType, total int) (message.Message, int, error) {
 	var (
 		b    []byte
@@ -165,8 +168,7 @@ func (this *service) peekMessage(mtype message.MessageType, total int) (message.
 	)
 
 	if this.in == nil {
-		err = ErrBufferNotReady
-		return nil, 0, err
+		return nil, 0, ErrBufferNotReady
 	}
 
 	// Peek until we get total bytes
@@ -192,6 +194,8 @@ func (this *service) peekMessage(mtype message.MessageType, total int) (message.
 	return msg, n, err
 }
 
+// readMessage() reads and copies a message from the buffer. The buffer bytes are
+// committed as a result of the read.
 func (this *service) readMessage(mtype message.MessageType, total int) (message.Message, int, error) {
 	var (
 		b   []byte
@@ -199,12 +203,6 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 		n   int
 		msg message.Message
 	)
-
-	//defer func() {
-	//	if err != nil {
-	//		glog.Errorf("(%s) %v", this.cid, err)
-	//	}
-	//}()
 
 	if this.in == nil {
 		err = ErrBufferNotReady
@@ -220,6 +218,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 	for l < total {
 		n, err = this.in.Read(this.intmp[l:])
 		l += n
+		glog.Debugf("read %d bytes, total %d", n, l)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -236,6 +235,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 	return msg, n, err
 }
 
+// writeMessage() writes a message to the outgoing buffer
 func (this *service) writeMessage(msg message.Message) (int, error) {
 	var (
 		l    int = msg.Len()
@@ -246,8 +246,7 @@ func (this *service) writeMessage(msg message.Message) (int, error) {
 	)
 
 	if this.out == nil {
-		err = ErrBufferNotReady
-		return 0, err
+		return 0, ErrBufferNotReady
 	}
 
 	// This is to serialize writes to the underlying buffer. Multiple goroutines could
@@ -261,7 +260,7 @@ func (this *service) writeMessage(msg message.Message) (int, error) {
 	// Mainly because when there's a large number of goroutines that want to publish
 	// to this client, then they will all block. However, this will do for now.
 	//
-	// FIXME
+	// FIXME: Try to find a better way than a mutex...if possible.
 	this.wmu.Lock()
 	defer this.wmu.Unlock()
 
@@ -295,6 +294,8 @@ func (this *service) writeMessage(msg message.Message) (int, error) {
 			return 0, err
 		}
 	}
+
+	this.outStat.increment(int64(m))
 
 	return m, nil
 }

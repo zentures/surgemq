@@ -26,6 +26,10 @@ import (
 	"github.com/surge/surgemq/topics"
 )
 
+const (
+	minKeepAlive = 30
+)
+
 type Client struct {
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
@@ -74,6 +78,10 @@ func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error)
 		}
 	}()
 
+	if msg.KeepAlive() < minKeepAlive {
+		msg.SetKeepAlive(minKeepAlive)
+	}
+
 	if err = writeMessage(conn, msg); err != nil {
 		return err
 	}
@@ -89,29 +97,28 @@ func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error)
 		return resp.ReturnCode()
 	}
 
-	sess := this.getSession(msg)
+	this.svc = &service{
+		id:     atomic.AddUint64(&gsvcid, 1),
+		client: true,
+		conn:   conn,
 
-	p := topics.NewMemProvider()
-	topics.Register(sess.ID(), p)
+		keepAlive:      int(msg.KeepAlive()),
+		connectTimeout: this.ConnectTimeout,
+		ackTimeout:     this.AckTimeout,
+		timeoutRetries: this.TimeoutRetries,
+	}
 
-	topicsMgr, err := topics.NewManager(sess.ID())
+	err = this.getSession(this.svc, msg, resp)
 	if err != nil {
 		return err
 	}
 
-	this.svc = &service{
-		id:     atomic.AddUint64(&gsvcid, 1),
-		cid:    sess.ID(),
-		client: true,
+	p := topics.NewMemProvider()
+	topics.Register(this.svc.sess.ID(), p)
 
-		keepAlive:      this.KeepAlive,
-		connectTimeout: this.ConnectTimeout,
-		ackTimeout:     this.AckTimeout,
-		timeoutRetries: this.TimeoutRetries,
-
-		conn:      conn,
-		sess:      sess,
-		topicsMgr: topicsMgr,
+	this.svc.topicsMgr, err = topics.NewManager(this.svc.sess.ID())
+	if err != nil {
+		return err
 	}
 
 	if err := this.svc.start(); err != nil {
@@ -146,21 +153,10 @@ func (this *Client) Disconnect() {
 	this.svc.stop()
 }
 
-func (this *Client) getSession(req *message.ConnectMessage) sessions.Session {
-	cid := string(req.ClientId())
-
-	sess := sessions.NewMemSession(cid)
-
-	sess.Set(keyClientId, cid)
-	sess.Set(keyKeepAlive, time.Duration(req.KeepAlive()))
-	sess.Set(keyUsername, string(req.Username()))
-	sess.Set(keyWillRetain, req.WillRetain())
-	sess.Set(keyWillQos, req.WillQos())
-	sess.Set(keyWillTopic, string(req.WillTopic()))
-	sess.Set(keyWillMessage, string(req.WillMessage()))
-	sess.Set(keyVersion, req.Version())
-
-	return sess
+func (this *Client) getSession(svc *service, req *message.ConnectMessage, resp *message.ConnackMessage) error {
+	//id := string(req.ClientId())
+	svc.sess = &sessions.Session{}
+	return svc.sess.Init(req)
 }
 
 func (this *Client) checkConfiguration() {

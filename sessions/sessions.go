@@ -23,24 +23,19 @@ import (
 )
 
 var (
-	ErrSessionsProviderNotFound = errors.New("auth: Session provider not found")
+	ErrSessionsProviderNotFound = errors.New("Session: Session provider not found")
+	ErrKeyNotAvailable          = errors.New("Session: not item found for key.")
 
 	providers = make(map[string]SessionsProvider)
 )
 
-type Session interface {
-	Set(key, value interface{}) error
-	Get(key interface{}) (interface{}, error)
-	Del(key interface{})
-	ID() string
-}
-
 type SessionsProvider interface {
-	New(id string) (Session, error)
-	Get(id string) (Session, error)
+	New(id string) (*Session, error)
+	Get(id string) (*Session, error)
 	Del(id string)
 	Save(id string) error
 	Count() int
+	Close() error
 }
 
 // Register makes a session provider available by the provided name.
@@ -75,14 +70,14 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) New(id string) (Session, error) {
+func (this *Manager) New(id string) (*Session, error) {
 	if id == "" {
 		id = this.sessionId()
 	}
 	return this.p.New(id)
 }
 
-func (this *Manager) Get(id string) (Session, error) {
+func (this *Manager) Get(id string) (*Session, error) {
 	return this.p.Get(id)
 }
 
@@ -96,6 +91,10 @@ func (this *Manager) Save(id string) error {
 
 func (this *Manager) Count() int {
 	return this.p.Count()
+}
+
+func (this *Manager) Close() error {
+	return this.p.Close()
 }
 
 func (manager *Manager) sessionId() string {

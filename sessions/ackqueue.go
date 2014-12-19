@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package sessions
 
 import (
 	"errors"
@@ -32,48 +32,42 @@ var (
 
 type ackmsg struct {
 	// Message type of the message waiting for ack
-	mtype message.MessageType
+	Mtype message.MessageType
 
 	// Current state of the ack-waiting message
-	state message.MessageType
+	State message.MessageType
 
 	// Packet ID of the message. Every message that require ack'ing must have a valid
 	// packet ID. Messages that have message I
-	pktid uint16
+	Pktid uint16
 
 	// Slice containing the message bytes
-	msgbuf []byte
+	Msgbuf []byte
 
 	// Slice containing the ack message bytes
-	ackbuf []byte
+	Ackbuf []byte
 
 	// When ack cycle completes, call this function
-	onComplete OnCompleteFunc
+	OnComplete interface{}
 }
 
-// ackqueue is used to store messages that are waiting for acks to come back.
-// There are a few scenarios in which acks are required.
-//  1. Client sends SUBSCRIBE message to server, waits for SUBACK.
-//  2. Client sends UNSUBSCRIBE message to server, waits for UNSUBACK.
-//  3. Client sends PUBLISH QoS 1 message to server, waits for PUBACK.
-//  4. Server sends PUBLISH QoS 1 message to client, waits for PUBACK.
-//  5. Client sends PUBLISH QoS 2 message to server, waits for PUBREC.
-//  6. Server sends PUBREC message to client, waits for PUBREL.
-//  7. Client sends PUBREL message to server, waits for PUBCOMP.
-//  8. Server sends PUBLISH QoS 2 message to client, waits for PUBREC.
-//  9. Client sends PUBREC message to server, waits for PUBREL.
-// 10. Server sends PUBREL message to client, waits for PUBCOMP.
-// 11. Client sends PINGREQ message to server, waits for PINGRESP.
-//
-// ackqueue provides two functions: ackwait() and ack().
-// - ackwait() copies the message into the queue in the order ackwait() is called.
-// - ack() takes the ack message supplied and updates the status of messages waiting.
-//   ack() also checks the head for any messages that have completed its ack cycle,
-//   if there's any, it will be processed them accordingly. If the
-//
-// ackqueue is a growing queue implemented based on a ring buffer. As the buffer
+// Ackqueue is a growing queue implemented based on a ring buffer. As the buffer
 // gets full, it will auto-grow.
-type ackqueue struct {
+//
+// Ackqueue is used to store messages that are waiting for acks to come back. There
+// are a few scenarios in which acks are required.
+//   1. Client sends SUBSCRIBE message to server, waits for SUBACK.
+//   2. Client sends UNSUBSCRIBE message to server, waits for UNSUBACK.
+//   3. Client sends PUBLISH QoS 1 message to server, waits for PUBACK.
+//   4. Server sends PUBLISH QoS 1 message to client, waits for PUBACK.
+//   5. Client sends PUBLISH QoS 2 message to server, waits for PUBREC.
+//   6. Server sends PUBREC message to client, waits for PUBREL.
+//   7. Client sends PUBREL message to server, waits for PUBCOMP.
+//   8. Server sends PUBLISH QoS 2 message to client, waits for PUBREC.
+//   9. Client sends PUBREC message to server, waits for PUBREL.
+//   10. Server sends PUBREL message to client, waits for PUBCOMP.
+//   11. Client sends PINGREQ message to server, waits for PINGRESP.
+type Ackqueue struct {
 	size  int64
 	mask  int64
 	count int64
@@ -89,13 +83,13 @@ type ackqueue struct {
 	mu sync.Mutex
 }
 
-func newAckqueue(n int) *ackqueue {
+func newAckqueue(n int) *Ackqueue {
 	m := int64(n)
 	if !powerOfTwo64(m) {
-		m = roundUppowerOfTwo64(m)
+		m = roundUpPowerOfTwo64(m)
 	}
 
-	return &ackqueue{
+	return &Ackqueue{
 		size:    m,
 		mask:    m - 1,
 		count:   0,
@@ -107,7 +101,9 @@ func newAckqueue(n int) *ackqueue {
 	}
 }
 
-func (this *ackqueue) wait(msg message.Message, onComplete OnCompleteFunc) error {
+// Wait() copies the message into a waiting queue, and waits for the corresponding
+// ack message to be received.
+func (this *Ackqueue) Wait(msg message.Message, onComplete interface{}) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -128,9 +124,9 @@ func (this *ackqueue) wait(msg message.Message, onComplete OnCompleteFunc) error
 
 	case *message.PingreqMessage:
 		this.ping = ackmsg{
-			mtype:      message.PINGREQ,
-			state:      message.RESERVED,
-			onComplete: onComplete,
+			Mtype:      message.PINGREQ,
+			State:      message.RESERVED,
+			OnComplete: onComplete,
 		}
 
 	default:
@@ -140,7 +136,8 @@ func (this *ackqueue) wait(msg message.Message, onComplete OnCompleteFunc) error
 	return nil
 }
 
-func (this *ackqueue) ack(msg message.Message) error {
+// Ack() takes the ack message supplied and updates the status of messages waiting.
+func (this *Ackqueue) Ack(msg message.Message) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -151,12 +148,12 @@ func (this *ackqueue) ack(msg message.Message) error {
 		if ok {
 			// If message w/ the packet ID exists, update the message state and copy
 			// the ack message
-			this.ring[i].state = msg.Type()
+			this.ring[i].State = msg.Type()
 
 			ml := msg.Len()
-			this.ring[i].ackbuf = make([]byte, ml)
+			this.ring[i].Ackbuf = make([]byte, ml)
 
-			_, err := msg.Encode(this.ring[i].ackbuf)
+			_, err := msg.Encode(this.ring[i].Ackbuf)
 			if err != nil {
 				return err
 			}
@@ -166,8 +163,8 @@ func (this *ackqueue) ack(msg message.Message) error {
 		}
 
 	case message.PINGRESP:
-		if this.ping.mtype == message.PINGREQ {
-			this.ping.state = message.PINGRESP
+		if this.ping.Mtype == message.PINGREQ {
+			this.ping.State = message.PINGRESP
 		}
 
 	default:
@@ -177,20 +174,21 @@ func (this *ackqueue) ack(msg message.Message) error {
 	return nil
 }
 
-func (this *ackqueue) acked() []ackmsg {
+// Acked() returns the list of messages that have completed the ack cycle.
+func (this *Ackqueue) Acked() []ackmsg {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	this.ackdone = this.ackdone[0:0]
 
-	if this.ping.state == message.PINGRESP {
+	if this.ping.State == message.PINGRESP {
 		this.ackdone = append(this.ackdone, this.ping)
 		this.ping = ackmsg{}
 	}
 
 FORNOTEMPTY:
 	for !this.empty() {
-		switch this.ring[this.head].state {
+		switch this.ring[this.head].State {
 		case message.PUBACK, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
 			this.ackdone = append(this.ackdone, this.ring[this.head])
 			this.removeHead()
@@ -203,7 +201,7 @@ FORNOTEMPTY:
 	return this.ackdone
 }
 
-func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCompleteFunc) error {
+func (this *Ackqueue) insert(pktid uint16, msg message.Message, onComplete interface{}) error {
 	if this.full() {
 		this.grow()
 	}
@@ -214,14 +212,14 @@ func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCom
 
 		// ackmsg
 		am := ackmsg{
-			mtype:      msg.Type(),
-			state:      message.RESERVED,
-			pktid:      msg.PacketId(),
-			msgbuf:     make([]byte, ml),
-			onComplete: onComplete,
+			Mtype:      msg.Type(),
+			State:      message.RESERVED,
+			Pktid:      msg.PacketId(),
+			Msgbuf:     make([]byte, ml),
+			OnComplete: onComplete,
 		}
 
-		if _, err := msg.Encode(am.msgbuf); err != nil {
+		if _, err := msg.Encode(am.Msgbuf); err != nil {
 			return err
 		}
 
@@ -249,7 +247,7 @@ func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCom
 	return nil
 }
 
-func (this *ackqueue) removeHead() error {
+func (this *Ackqueue) removeHead() error {
 	if this.empty() {
 		return errQueueEmpty
 	}
@@ -259,12 +257,12 @@ func (this *ackqueue) removeHead() error {
 	this.ring[this.head] = ackmsg{}
 	this.head = this.increment(this.head)
 	this.count--
-	delete(this.emap, it.pktid)
+	delete(this.emap, it.Pktid)
 
 	return nil
 }
 
-func (this *ackqueue) grow() {
+func (this *Ackqueue) grow() {
 	if math.MaxInt64/2 < this.size {
 		panic("new size will overflow int64")
 	}
@@ -289,74 +287,47 @@ func (this *ackqueue) grow() {
 	this.emap = make(map[uint16]int64, this.size)
 
 	for i := int64(0); i < this.tail; i++ {
-		this.emap[this.ring[i].pktid] = i
+		this.emap[this.ring[i].Pktid] = i
 	}
 }
 
-func (this *ackqueue) len() int {
+func (this *Ackqueue) len() int {
 	return int(this.count)
 }
 
-func (this *ackqueue) cap() int {
+func (this *Ackqueue) cap() int {
 	return int(this.size)
 }
 
-func (this *ackqueue) index(n int64) int64 {
+func (this *Ackqueue) index(n int64) int64 {
 	return n & this.mask
 }
 
-func (this *ackqueue) full() bool {
+func (this *Ackqueue) full() bool {
 	return this.count == this.size
 }
 
-func (this *ackqueue) empty() bool {
+func (this *Ackqueue) empty() bool {
 	return this.count == 0
 }
 
-func (this *ackqueue) increment(n int64) int64 {
+func (this *Ackqueue) increment(n int64) int64 {
 	return this.index(n + 1)
 }
 
-/*
-func (this *ackqueue) Acked() []ackmsg {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-
-	this.acked = this.acked[0:0]
-
-	if this.ping.state == message.PINGRESP {
-		this.acked = append(this.acked, this.ping)
-		this.ping = ackmsg{}
-	}
-
-FORNOTEMPTY:
-	for !this.empty() {
-		switch this.ring[this.head].state {
-		case message.PUBACK, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
-			this.acked = append(this.acked, this.ring[this.head])
-			this.removeHead()
-
-		default:
-			break FORNOTEMPTY
-		}
-	}
-
-	return this.acked
+func powerOfTwo64(n int64) bool {
+	return n != 0 && (n&(n-1)) == 0
 }
 
-func (this *ackqueue) insert(pktid uint16, msg message.Message, onComplete OnCompleteFunc) {
-	if this.full() {
-		this.grow()
-	}
+func roundUpPowerOfTwo64(n int64) int64 {
+	n--
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	n |= n >> 32
+	n++
 
-	i, ok := this.emap[pktid]
-	if !ok {
-		this.ring[this.tail] = ackmsg{msg: msg, pktid: pktid, onComplete: onComplete}
-		this.emap[pktid] = this.tail
-		this.tail = this.increment(this.tail)
-		this.count++
-	} else {
-		this.ring[i].msg = msg
-	}
+	return n
 }
-*/

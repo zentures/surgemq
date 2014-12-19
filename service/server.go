@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -65,7 +66,7 @@ type Server struct {
 	TimeoutRetries int
 
 	// Authenticator is the authenticator used to check username and password sent
-	// in the CONNECT message. If not set then default to "mem".
+	// in the CONNECT message. If not set then default to "mockSuccess".
 	Authenticator string
 
 	// SessionsProvider is the session store that keeps all the Session objects.
@@ -77,32 +78,70 @@ type Server struct {
 	// If not set then default to "mem".
 	TopicsProvider string
 
-	authMgr   *auth.Manager
-	sessMgr   *sessions.Manager
+	// authMgr is the authentication manager that we are going to use for authenticating
+	// incoming connections
+	authMgr *auth.Manager
+
+	// sessMgr is the sessions manager for keeping track of the sessions
+	sessMgr *sessions.Manager
+
+	// topicsMgr is the topics manager for keeping track of subscriptions
 	topicsMgr *topics.Manager
+
+	// The quit channel for the server. If the server detects that this channel
+	// is closed, then it's a signal for it to shutdown as well.
+	quit chan struct{}
+
+	ln net.Listener
+
+	// A list of services created by the server. We keep track of them so we can
+	// gracefully shut them down if they are still alive when the server goes down.
+	svcs []*service
+
+	// Mutex for updating svcs
+	mu sync.Mutex
+
+	// A indicator on whether this server is running
+	running int32
 }
 
 func (this *Server) ListenAndServe(uri string) error {
+	defer atomic.CompareAndSwapInt32(&this.running, 1, 0)
+
+	if !atomic.CompareAndSwapInt32(&this.running, 0, 1) {
+		return fmt.Errorf("server/ListenAndServe: Server is already running")
+	}
+
+	this.quit = make(chan struct{})
+
 	u, err := url.Parse(uri)
 	if err != nil {
 		return err
 	}
 
-	ln, err := net.Listen(u.Scheme, u.Host)
+	this.ln, err = net.Listen(u.Scheme, u.Host)
 	if err != nil {
 		return err
 	}
-	defer ln.Close()
+	defer this.ln.Close()
 
 	glog.Infof("server/ListenAndServe: server is ready...")
 
 	var tempDelay time.Duration // how long to sleep on accept failure
 
 	for {
-		conn, err := ln.Accept()
+		conn, err := this.ln.Accept()
 
-		// Borrowed from go1.3.3/src/pkg/net/http/server.go:1699
 		if err != nil {
+			// http://zhen.org/blog/graceful-shutdown-of-go-net-dot-listeners/
+			select {
+			case <-this.quit:
+				return nil
+
+			default:
+			}
+
+			// Borrowed from go1.3.3/src/pkg/net/http/server.go:1699
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
@@ -120,6 +159,31 @@ func (this *Server) ListenAndServe(uri string) error {
 		}
 
 		go this.handleConnection(conn)
+	}
+
+	return nil
+}
+
+func (this *Server) Close() error {
+	// By closing the quit channel, we are telling the server to stop accepting new
+	// connection.
+	close(this.quit)
+
+	// We then close the net.Listener, which will force Accept() to return if it's
+	// blocked waiting for new connections.
+	this.ln.Close()
+
+	for _, svc := range this.svcs {
+		glog.Infof("Stopping service %d", svc.id)
+		svc.stop()
+	}
+
+	if this.sessMgr != nil {
+		this.sessMgr.Close()
+	}
+
+	if this.topicsMgr != nil {
+		this.topicsMgr.Close()
 	}
 
 	return nil
@@ -183,11 +247,15 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		return nil, err
 	}
 
+	if req.KeepAlive() == 0 {
+		req.SetKeepAlive(minKeepAlive)
+	}
+
 	svc = &service{
 		id:     atomic.AddUint64(&gsvcid, 1),
 		client: false,
 
-		keepAlive:      this.KeepAlive,
+		keepAlive:      int(req.KeepAlive()),
 		connectTimeout: this.ConnectTimeout,
 		ackTimeout:     this.AckTimeout,
 		timeoutRetries: this.TimeoutRetries,
@@ -208,15 +276,19 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		return nil, err
 	}
 
+	svc.inStat.increment(int64(req.Len()))
+	svc.outStat.increment(int64(resp.Len()))
+
 	if err := svc.start(); err != nil {
 		svc.stop()
 		return nil, err
 	}
 
-	svc.inStat.increment(int64(req.Len()))
-	svc.outStat.increment(int64(resp.Len()))
+	//this.mu.Lock()
+	//this.svcs = append(this.svcs, svc)
+	//this.mu.Unlock()
 
-	glog.Infof("(%d) server/handleConnection: Connection established with client %s.", svc.id, svc.cid)
+	glog.Infof("(%s) server/handleConnection: Connection established.", svc.cid())
 
 	return svc, nil
 }
@@ -290,40 +362,30 @@ func (this *Server) getSession(svc *service, req *message.ConnectMessage, resp *
 		req.SetCleanSession(true)
 	}
 
-	svc.cid = string(req.ClientId())
+	cid := string(req.ClientId())
 
 	// If CleanSession is NOT set, check the session store for existing session.
 	// If found, return it.
 	if !req.CleanSession() {
-		if svc.sess, err = this.sessMgr.Get(svc.cid); err == nil {
+		if svc.sess, err = this.sessMgr.Get(cid); err == nil {
 			resp.SetSessionPresent(true)
+
+			if err := svc.sess.Update(req); err != nil {
+				return err
+			}
 		}
 	}
 
 	// If CleanSession, or no existing session found, then create a new one
 	if svc.sess == nil {
-		if svc.sess, err = this.sessMgr.New(svc.cid); err != nil {
+		if svc.sess, err = this.sessMgr.New(cid); err != nil {
 			return err
 		}
 
 		resp.SetSessionPresent(false)
-	}
 
-	svc.sess.Set(keyClientId, svc.cid)
-	svc.sess.Set(keyKeepAlive, time.Duration(req.KeepAlive()))
-	svc.sess.Set(keyUsername, string(req.Username()))
-	svc.sess.Set(keyWillRetain, req.WillRetain())
-	svc.sess.Set(keyWillQos, req.WillQos())
-	svc.sess.Set(keyWillTopic, string(req.WillTopic()))
-	svc.sess.Set(keyWillMessage, string(req.WillMessage()))
-	svc.sess.Set(keyVersion, req.Version())
-
-	topics, qoss, err := getTopicsQoss(svc.sess)
-	if err != nil {
-		return err
-	} else {
-		for i, t := range topics {
-			this.topicsMgr.Subscribe([]byte(t), qoss[i], this)
+		if err := svc.sess.Init(req); err != nil {
+			return err
 		}
 	}
 

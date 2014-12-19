@@ -23,7 +23,9 @@ import (
 var clientIdRegexp *regexp.Regexp
 
 func init() {
-	clientIdRegexp = regexp.MustCompile("^[0-9a-zA-Z ]*$")
+	// Added space for Paho compliance test
+	// Added underscore (_) for MQTT C client test
+	clientIdRegexp = regexp.MustCompile("^[0-9a-zA-Z _]*$")
 }
 
 // After a Network Connection is established by a Client to a Server, the first Packet

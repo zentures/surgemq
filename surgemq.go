@@ -73,7 +73,6 @@ func main() {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, os.Interrupt, os.Kill)
 	go func() {
-		glog.Debugf("Waiting for os.Interrupt and os.Kill")
 		sig := <-sigchan
 		glog.Errorf("Existing due to trapped signal; %v", sig)
 
@@ -83,10 +82,12 @@ func main() {
 			f.Close()
 		}
 
+		svr.Close()
+
 		os.Exit(0)
 	}()
 
-	err = svr.ListenAndServe("tcp://127.0.0.1:1883")
+	err = svr.ListenAndServe("tcp://:1883")
 	if err != nil {
 		glog.Errorf("surgemq/main: %v", err)
 	}

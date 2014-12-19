@@ -16,17 +16,21 @@ package service
 
 import (
 	"fmt"
+	"net/url"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/dataence/assert"
 	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
+	"github.com/surge/surgemq/topics"
 )
 
 var authenticator string = "mockSuccess"
 
-func TestServiceConnectClientServer(t *testing.T) {
+func TestServiceConnectSuccess(t *testing.T) {
 	runClientServerTests(t, nil)
 }
 
@@ -37,7 +41,99 @@ func TestServiceConnectAuthError(t *testing.T) {
 	authenticator = old
 }
 
-func TestServiceSubUnsubSuccess(t *testing.T) {
+func TestServiceWillDelivery(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ready1 := make(chan struct{})
+	ready2 := make(chan struct{})
+	ready3 := make(chan struct{})
+	subscribers := 3
+
+	uri := "tcp://127.0.0.1:1883"
+	u, err := url.Parse(uri)
+	assert.NoError(t, true, err, "Error parsing URL")
+
+	// Start listener
+	wg.Add(1)
+	go startServiceN(t, u, &wg, ready1, ready2, subscribers)
+
+	<-ready1
+
+	c1 := connectToServer(t, uri)
+	assert.NotNil(t, true, c1)
+	defer topics.Unregister(c1.svc.sess.ID())
+
+	c2 := connectToServer(t, uri)
+	assert.NotNil(t, true, c2)
+	defer topics.Unregister(c2.svc.sess.ID())
+
+	c3 := connectToServer(t, uri)
+	assert.NotNil(t, true, c3)
+	defer topics.Unregister(c3.svc.sess.ID())
+
+	sub := message.NewSubscribeMessage()
+	sub.AddTopic([]byte("will"), 1)
+
+	subdone := int64(0)
+	willdone := int64(0)
+
+	c2.Subscribe(sub,
+		func(msg, ack message.Message, err error) error {
+			subs := atomic.AddInt64(&subdone, 1)
+			if subs == int64(subscribers-1) {
+				c1.Disconnect()
+			}
+
+			return nil
+		},
+		func(msg *message.PublishMessage) error {
+			assert.Equal(t, true, 1, msg.QoS())
+			assert.Equal(t, true, []byte("send me home"), msg.Payload())
+
+			will := atomic.AddInt64(&willdone, 1)
+			if will == int64(subscribers-1) {
+				close(ready3)
+			}
+
+			return nil
+		})
+
+	c3.Subscribe(sub,
+		func(msg, ack message.Message, err error) error {
+			subs := atomic.AddInt64(&subdone, 1)
+			if subs == int64(subscribers-1) {
+				c1.Disconnect()
+			}
+
+			return nil
+		},
+		func(msg *message.PublishMessage) error {
+			assert.Equal(t, true, 1, msg.QoS())
+			assert.Equal(t, true, []byte("send me home"), msg.Payload())
+
+			will := atomic.AddInt64(&willdone, 1)
+			if will == int64(subscribers-1) {
+				close(ready3)
+			}
+
+			return nil
+		})
+
+	select {
+	case <-ready3:
+
+	case <-time.After(time.Millisecond * 100):
+		assert.Fail(t, true, "Test timed out")
+	}
+
+	c2.Disconnect()
+
+	close(ready2)
+
+	wg.Wait()
+}
+
+func TestServiceSubUnsub(t *testing.T) {
 	runClientServerTests(t, func(c *Client) {
 		done := make(chan struct{})
 
@@ -52,6 +148,44 @@ func TestServiceSubUnsubSuccess(t *testing.T) {
 
 			},
 			func(msg *message.PublishMessage) error {
+				return nil
+			})
+
+		select {
+		case <-done:
+		case <-time.After(time.Millisecond * 100):
+			assert.Fail(t, true, "Timed out waiting for subscribe response")
+		}
+	})
+}
+
+func TestServiceSubRetain(t *testing.T) {
+	runClientServerTests(t, func(c *Client) {
+		rmsg := message.NewPublishMessage()
+		rmsg.SetRetain(true)
+		rmsg.SetQoS(0)
+		rmsg.SetTopic([]byte("abc"))
+		rmsg.SetPayload([]byte("this is a test"))
+
+		tmgr, _ := topics.NewManager("mem")
+		err := tmgr.Retain(rmsg)
+		assert.NoError(t, true, err)
+
+		done := make(chan struct{})
+
+		sub := newSubscribeMessage(1)
+		c.Subscribe(sub,
+			func(msg, ack message.Message, err error) error {
+				unsub := newUnsubscribeMessage()
+				return c.Unsubscribe(unsub, func(msg, ack message.Message, err error) error {
+					close(done)
+					return nil
+				})
+
+			},
+			func(msg *message.PublishMessage) error {
+				assert.Equal(t, true, msg.Topic(), []byte("abc"))
+				assert.Equal(t, true, msg.Payload(), []byte("this is a test"))
 				return nil
 			})
 
@@ -470,8 +604,6 @@ func TestServiceSub2Pub2(t *testing.T) {
 			},
 			func(msg *message.PublishMessage) error {
 				count++
-
-				glog.Debugf("Received %v", msg)
 
 				assertPublishMessage(t, msg, count, 2)
 

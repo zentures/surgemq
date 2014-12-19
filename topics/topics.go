@@ -25,6 +25,8 @@ package topics
 import (
 	"errors"
 	"fmt"
+
+	"github.com/surge/surgemq/message"
 )
 
 const (
@@ -55,6 +57,9 @@ type TopicsProvider interface {
 	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
 	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
+	Retain(msg *message.PublishMessage) error
+	Retained(topic []byte, msgs *[]*message.PublishMessage) error
+	Close() error
 }
 
 func Register(name string, provider TopicsProvider) {
@@ -96,4 +101,16 @@ func (this *Manager) Unsubscribe(topic []byte, subscriber interface{}) error {
 
 func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
 	return this.p.Subscribers(topic, qos, subs, qoss)
+}
+
+func (this *Manager) Retain(msg *message.PublishMessage) error {
+	return this.p.Retain(msg)
+}
+
+func (this *Manager) Retained(topic []byte, msgs *[]*message.PublishMessage) error {
+	return this.p.Retained(topic, msgs)
+}
+
+func (this *Manager) Close() error {
+	return this.p.Close()
 }
