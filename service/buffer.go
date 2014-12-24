@@ -168,8 +168,6 @@ func (this *buffer) ReadFrom(r io.Reader) (int64, error) {
 			return total, err
 		}
 	}
-
-	return total, nil
 }
 
 func (this *buffer) WriteTo(w io.Writer) (int64, error) {
@@ -204,8 +202,6 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 			return total, err
 		}
 	}
-
-	return total, nil
 }
 
 func (this *buffer) Read(p []byte) (int, error) {
@@ -283,8 +279,6 @@ func (this *buffer) Read(p []byte) (int, error) {
 		}
 		this.ccond.L.Unlock()
 	}
-
-	return 0, nil
 }
 
 func (this *buffer) Write(p []byte) (int, error) {

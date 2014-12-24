@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
@@ -36,8 +37,8 @@ type stat struct {
 }
 
 func (this *stat) increment(n int64) {
-	this.bytes += n
-	this.msgs++
+	atomic.AddInt64(&this.bytes, n)
+	atomic.AddInt64(&this.msgs, 1)
 }
 
 var (
@@ -193,10 +194,10 @@ func (this *service) stop() {
 		}
 	}()
 
-	//doit := atomic.CompareAndSwapInt64(&this.closed, 0, 1)
-	//if !doit {
-	//	return
-	//}
+	doit := atomic.CompareAndSwapInt64(&this.closed, 0, 1)
+	if !doit {
+		return
+	}
 
 	// Close quit channel, effectively telling all the goroutines it's time to quit
 	if this.done != nil {

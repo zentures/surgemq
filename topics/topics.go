@@ -30,16 +30,16 @@ import (
 )
 
 const (
-	// Multi-level wildcard
+	// MWC is the multi-level wildcard
 	MWC = "#"
 
-	// Single level wildcard
+	// SWC is the single level wildcard
 	SWC = "+"
 
-	// Topic level separator
+	// SEP is the topic level separator
 	SEP = "/"
 
-	// system level topics
+	// SYS is the starting character of the system level topics
 	SYS = "$"
 
 	// Both wildcards
@@ -47,12 +47,17 @@ const (
 )
 
 var (
-	ErrAuthFailure          = errors.New("auth: Authentication failure")
+	// ErrAuthFailure is returned when the user/pass supplied are invalid
+	ErrAuthFailure = errors.New("auth: Authentication failure")
+
+	// ErrAuthProviderNotFound is returned when the requested provider does not exist.
+	// It probably hasn't been registered yet.
 	ErrAuthProviderNotFound = errors.New("auth: Authentication provider not found")
 
 	providers = make(map[string]TopicsProvider)
 )
 
+// TopicsProvider
 type TopicsProvider interface {
 	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error

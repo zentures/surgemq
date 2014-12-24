@@ -48,6 +48,8 @@ const (
 	DefaultTopicsProvider   = "mem"
 )
 
+// Server is a library implementation of the MQTT server that, as best it can, complies
+// with the MQTT 3.1 and 3.1.1 specs.
 type Server struct {
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
@@ -103,8 +105,16 @@ type Server struct {
 
 	// A indicator on whether this server is running
 	running int32
+
+	// A indicator on whether this server has already checked configuration
+	configed int32
 }
 
+// ListenAndServe listents to connections on the URI requested, and handles any
+// incoming MQTT client sessions. It should not return until Close() is called
+// or if there's some critical error that stops the server from running. The URI
+// supplied should be of the form "protocol://host:port" that can be parsed by
+// url.Parse(). For example, an URI could be "tcp://0.0.0.0:1883".
 func (this *Server) ListenAndServe(uri string) error {
 	defer atomic.CompareAndSwapInt32(&this.running, 1, 0)
 
@@ -160,10 +170,10 @@ func (this *Server) ListenAndServe(uri string) error {
 
 		go this.handleConnection(conn)
 	}
-
-	return nil
 }
 
+// Close terminates the server by shutting down all the client connections and closing
+// the listener. It will, as best it can, clean up after itself.
 func (this *Server) Close() error {
 	// By closing the quit channel, we are telling the server to stop accepting new
 	// connection.
@@ -294,6 +304,10 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 }
 
 func (this *Server) checkConfiguration() error {
+	if !atomic.CompareAndSwapInt32(&this.configed, 0, 1) {
+		return nil
+	}
+
 	var err error
 
 	if this.KeepAlive == 0 {

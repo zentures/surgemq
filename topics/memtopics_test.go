@@ -49,7 +49,7 @@ func TestNextTopicLevelSuccess(t *testing.T) {
 	for i, topic := range topics {
 		var (
 			tl  []byte
-			rem []byte = topic
+			rem = topic
 			err error
 		)
 
@@ -467,7 +467,7 @@ func TestRNodeMatch(t *testing.T) {
 	err = n.rinsert(msg3.Topic(), msg3)
 	assert.NoError(t, true, err)
 
-	msglist := make([]*message.PublishMessage, 0)
+	var msglist []*message.PublishMessage
 
 	// ---
 
@@ -582,7 +582,7 @@ func TestMemTopicsRetained(t *testing.T) {
 	err = mgr.Retain(msg3)
 	assert.NoError(t, true, err)
 
-	msglist := make([]*message.PublishMessage, 0)
+	var msglist []*message.PublishMessage
 
 	// ---
 

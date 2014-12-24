@@ -15,7 +15,6 @@
 package topics
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -24,11 +23,8 @@ import (
 )
 
 var (
-	MaxQosAllowed byte = message.QosExactlyOnce
-)
-
-var (
-	ErrKeyNotAvailable error = errors.New("Session: not item found for key.")
+	// MaxQosAllowed is the maximum QOS supported by this server
+	MaxQosAllowed = message.QosExactlyOnce
 )
 
 var _ TopicsProvider = (*memTopics)(nil)
@@ -51,6 +47,10 @@ func init() {
 
 var _ TopicsProvider = (*memTopics)(nil)
 
+// NewMemProvider returns an new instance of the memTopics, which is implements the
+// TopicsProvider interface. memProvider is a hidden struct that stores the topic
+// subscriptions and retained messages in memory. The content is not persistend so
+// when the server goes, everything will be gone. Use with care.
 func NewMemProvider() *memTopics {
 	return &memTopics{
 		sroot: newSNode(),
@@ -458,9 +458,9 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 
 			if i == 0 {
 				return []byte(SWC), topic[i+1:], nil
-			} else {
-				return topic[:i], topic[i+1:], nil
 			}
+
+			return topic[:i], topic[i+1:], nil
 
 		case '#':
 			if i != 0 {

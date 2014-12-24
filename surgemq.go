@@ -38,8 +38,8 @@ var (
 
 func init() {
 	flag.IntVar(&keepAlive, "keepalive", service.DefaultKeepAlive, "Keepalive (sec)")
-	flag.IntVar(&connectTimeout, "connect", service.DefaultConnectTimeout, "Connect Timeout (sec)")
-	flag.IntVar(&ackTimeout, "ack", service.DefaultAckTimeout, "Ack Timeout (sec)")
+	flag.IntVar(&connectTimeout, "connecttimeout", service.DefaultConnectTimeout, "Connect Timeout (sec)")
+	flag.IntVar(&ackTimeout, "acktimeout", service.DefaultAckTimeout, "Ack Timeout (sec)")
 	flag.IntVar(&timeoutRetries, "retries", service.DefaultTimeoutRetries, "Timeout Retries")
 	flag.StringVar(&authenticator, "auth", service.DefaultAuthenticator, "Authenticator Type")
 	flag.StringVar(&sessionsProvider, "sessions", service.DefaultSessionsProvider, "Session Provider Type")

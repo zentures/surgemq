@@ -206,7 +206,7 @@ func (this *header) decode(src []byte) (int, error) {
 
 	//this.flags = src[total] & 0x0f
 	if this.Type() != PUBLISH && this.Flags() != this.Type().DefaultFlags() {
-		return total, fmt.Errorf("header/Decode: Invalid message (%d) flags. Expecting %d, got %d", this.Type(), this.Type().DefaultFlags, this.Flags())
+		return total, fmt.Errorf("header/Decode: Invalid message (%d) flags. Expecting %d, got %d", this.Type(), this.Type().DefaultFlags(), this.Flags())
 	}
 
 	if this.Type() == PUBLISH && !ValidQos((this.Flags()>>1)&0x3) {
