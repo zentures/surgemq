@@ -25,7 +25,7 @@ func TestUnsubackMessageFields(t *testing.T) {
 
 	msg.SetPacketId(100)
 
-	assert.Equal(t, true, 100, msg.PacketId())
+	assert.Equal(t, true, 100, int(msg.PacketId()))
 }
 
 func TestUnsubackMessageDecode(t *testing.T) {
@@ -42,7 +42,7 @@ func TestUnsubackMessageDecode(t *testing.T) {
 	assert.NoError(t, true, err, "Error decoding message.")
 	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
 	assert.Equal(t, true, UNSUBACK, msg.Type(), "Error decoding message.")
-	assert.Equal(t, true, 7, msg.PacketId(), "Error decoding message.")
+	assert.Equal(t, true, 7, int(msg.PacketId()), "Error decoding message.")
 }
 
 // test insufficient bytes

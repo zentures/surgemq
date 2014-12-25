@@ -26,7 +26,7 @@ func TestPublishMessageHeaderFields(t *testing.T) {
 
 	assert.True(t, true, msg.Dup(), "Incorrect DUP flag.")
 	assert.True(t, true, msg.Retain(), "Incorrect RETAIN flag.")
-	assert.Equal(t, true, 1, msg.QoS(), "Incorrect QoS.")
+	assert.Equal(t, true, 1, int(msg.QoS()), "Incorrect QoS.")
 
 	msg.SetDup(false)
 
@@ -39,7 +39,7 @@ func TestPublishMessageHeaderFields(t *testing.T) {
 	err := msg.SetQoS(2)
 
 	assert.NoError(t, true, err, "Error setting QoS.")
-	assert.Equal(t, true, 2, msg.QoS(), "Incorrect QoS.")
+	assert.Equal(t, true, 2, int(msg.QoS()), "Incorrect QoS.")
 
 	err = msg.SetQoS(3)
 
@@ -48,7 +48,7 @@ func TestPublishMessageHeaderFields(t *testing.T) {
 	err = msg.SetQoS(0)
 
 	assert.NoError(t, true, err, "Error setting QoS.")
-	assert.Equal(t, true, 0, msg.QoS(), "Incorrect QoS.")
+	assert.Equal(t, true, 0, int(msg.QoS()), "Incorrect QoS.")
 
 	msg.SetDup(true)
 
@@ -72,7 +72,7 @@ func TestPublishMessageFields(t *testing.T) {
 
 	msg.SetPacketId(100)
 
-	assert.Equal(t, true, 100, msg.PacketId(), "Error setting acket ID.")
+	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting acket ID.")
 
 	msg.SetPayload([]byte("this is a payload to be sent"))
 
@@ -96,7 +96,7 @@ func TestPublishMessageDecode1(t *testing.T) {
 
 	assert.NoError(t, true, err, "Error decoding message.")
 	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, 7, msg.PacketId(), "Error decoding message.")
+	assert.Equal(t, true, 7, int(msg.PacketId()), "Error decoding message.")
 	assert.Equal(t, true, "surgemq", string(msg.Topic()), "Error deocding topic name.")
 	assert.Equal(t, true, []byte{'s', 'e', 'n', 'd', ' ', 'm', 'e', ' ', 'h', 'o', 'm', 'e'}, msg.Payload(), "Error deocding payload.")
 }

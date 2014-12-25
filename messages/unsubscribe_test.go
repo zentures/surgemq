@@ -24,7 +24,7 @@ func TestUnsubscribeMessageFields(t *testing.T) {
 	msg := NewUnsubscribeMessage()
 
 	msg.SetPacketId(100)
-	assert.Equal(t, true, 100, msg.PacketId(), "Error setting packet ID.")
+	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting packet ID.")
 
 	msg.AddTopic([]byte("/a/b/#/c"))
 	assert.Equal(t, true, 1, len(msg.Topics()), "Error adding topic.")

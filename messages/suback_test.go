@@ -24,7 +24,7 @@ func TestSubackMessageFields(t *testing.T) {
 	msg := NewSubackMessage()
 
 	msg.SetPacketId(100)
-	assert.Equal(t, true, 100, msg.PacketId(), "Error setting packet ID.")
+	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting packet ID.")
 
 	msg.AddReturnCode(1)
 	assert.Equal(t, true, 1, len(msg.ReturnCodes()), "Error adding return code.")

@@ -44,7 +44,7 @@ func TestMessageHeaderFields(t *testing.T) {
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, PUBREL, header.Type())
 	assert.Equal(t, true, "PUBREL", header.Name())
-	assert.Equal(t, true, 2, header.Flags())
+	assert.Equal(t, true, 2, int(header.Flags()))
 }
 
 // Not enough bytes

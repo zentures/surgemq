@@ -24,7 +24,7 @@ func TestSubscribeMessageFields(t *testing.T) {
 	msg := NewSubscribeMessage()
 
 	msg.SetPacketId(100)
-	assert.Equal(t, true, 100, msg.PacketId(), "Error setting packet ID.")
+	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting packet ID.")
 
 	msg.AddTopic([]byte("/a/b/#/c"), 1)
 	assert.Equal(t, true, 1, len(msg.Topics()), "Error adding topic.")
@@ -63,11 +63,11 @@ func TestSubscribeMessageDecode(t *testing.T) {
 	assert.Equal(t, true, SUBSCRIBE, msg.Type(), "Error decoding message.")
 	assert.Equal(t, true, 3, len(msg.Topics()), "Error decoding topics.")
 	assert.True(t, true, msg.TopicExists([]byte("surgemq")), "Topic 'surgemq' should exist.")
-	assert.Equal(t, true, 0, msg.TopicQos([]byte("surgemq")), "Incorrect topic qos.")
+	assert.Equal(t, true, 0, int(msg.TopicQos([]byte("surgemq"))), "Incorrect topic qos.")
 	assert.True(t, true, msg.TopicExists([]byte("/a/b/#/c")), "Topic '/a/b/#/c' should exist.")
-	assert.Equal(t, true, 1, msg.TopicQos([]byte("/a/b/#/c")), "Incorrect topic qos.")
+	assert.Equal(t, true, 1, int(msg.TopicQos([]byte("/a/b/#/c"))), "Incorrect topic qos.")
 	assert.True(t, true, msg.TopicExists([]byte("/a/b/#/cdd")), "Topic '/a/b/#/c' should exist.")
-	assert.Equal(t, true, 2, msg.TopicQos([]byte("/a/b/#/cdd")), "Incorrect topic qos.")
+	assert.Equal(t, true, 2, int(msg.TopicQos([]byte("/a/b/#/cdd"))), "Incorrect topic qos.")
 }
 
 // test empty topic list
