@@ -48,7 +48,7 @@ func TestSessionInit(t *testing.T) {
 	assert.Equal(t, true, 1, len(topics))
 	assert.Equal(t, true, 1, len(qoss))
 	assert.Equal(t, true, "test", topics[0])
-	assert.Equal(t, true, 1, qoss[0])
+	assert.Equal(t, true, 1, int(qoss[0]))
 
 	sess.RemoveTopic("test")
 	assert.Equal(t, true, 0, len(sess.topics))

@@ -272,7 +272,7 @@ func TestSNodeMatch1(t *testing.T) {
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
-	assert.Equal(t, true, 1, qoss[0])
+	assert.Equal(t, true, 1, int(qoss[0]))
 }
 
 func TestSNodeMatch2(t *testing.T) {
@@ -287,8 +287,7 @@ func TestSNodeMatch2(t *testing.T) {
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
-	assert.Equal(t, true, 1, qoss[0])
-
+	assert.Equal(t, true, 1, int(qoss[0]))
 }
 
 func TestSNodeMatch3(t *testing.T) {
@@ -303,7 +302,7 @@ func TestSNodeMatch3(t *testing.T) {
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
-	assert.Equal(t, true, 2, qoss[0])
+	assert.Equal(t, true, 2, int(qoss[0]))
 }
 
 func TestSNodeMatch4(t *testing.T) {
@@ -317,7 +316,7 @@ func TestSNodeMatch4(t *testing.T) {
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
-	assert.Equal(t, true, 2, qoss[0])
+	assert.Equal(t, true, 2, int(qoss[0]))
 }
 
 func TestSNodeMatch5(t *testing.T) {
@@ -536,7 +535,7 @@ func TestMemTopicsSubscription(t *testing.T) {
 	qos, err := mgr.Subscribe([]byte("sports/tennis/+/stats"), 2, "sub1")
 
 	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, qos)
+	assert.Equal(t, true, 1, int(qos))
 
 	err = mgr.Unsubscribe([]byte("sports/tennis"), "sub1")
 
@@ -554,7 +553,7 @@ func TestMemTopicsSubscription(t *testing.T) {
 
 	assert.NoError(t, true, err)
 	assert.Equal(t, true, 1, len(subs))
-	assert.Equal(t, true, 1, qoss[0])
+	assert.Equal(t, true, 1, int(qoss[0]))
 
 	err = mgr.Unsubscribe([]byte("sports/tennis/+/stats"), "sub1")
 

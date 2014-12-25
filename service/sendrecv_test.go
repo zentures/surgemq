@@ -61,9 +61,9 @@ func TestReadMessageSuccess(t *testing.T) {
 
 	msg := m.(*message.ConnectMessage)
 
-	assert.Equal(t, true, 0x1, msg.WillQos(), "Incorrect Will QoS")
+	assert.Equal(t, true, message.QosAtLeastOnce, msg.WillQos(), "Incorrect Will QoS")
 
-	assert.Equal(t, true, 10, msg.KeepAlive(), "Incorrect KeepAlive value.")
+	assert.Equal(t, true, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
 
 	assert.Equal(t, true, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
 

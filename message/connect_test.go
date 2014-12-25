@@ -26,7 +26,7 @@ func TestConnectMessageFields(t *testing.T) {
 	err := msg.SetVersion(0x3)
 	assert.NoError(t, false, err, "Error setting message version.")
 
-	assert.Equal(t, false, 0x3, msg.Version(), "Incorrect version number")
+	assert.Equal(t, false, 0x3, int(msg.Version()), "Incorrect version number")
 
 	err = msg.SetVersion(0x5)
 	assert.Error(t, false, err)
@@ -62,7 +62,7 @@ func TestConnectMessageFields(t *testing.T) {
 	assert.False(t, false, msg.UsernameFlag(), "Error setting username flag.")
 
 	msg.SetWillQos(1)
-	assert.Equal(t, false, 1, msg.WillQos(), "Error setting will QoS.")
+	assert.Equal(t, false, 1, int(msg.WillQos()), "Error setting will QoS.")
 
 	err = msg.SetWillQos(4)
 	assert.Error(t, false, err)
@@ -161,8 +161,8 @@ func TestConnectMessageDecode(t *testing.T) {
 
 	assert.NoError(t, true, err, "Error decoding message.")
 	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, 206, msg.connectFlags, "Incorrect flag value.")
-	assert.Equal(t, true, 10, msg.KeepAlive(), "Incorrect KeepAlive value.")
+	assert.Equal(t, true, 206, int(msg.connectFlags), "Incorrect flag value.")
+	assert.Equal(t, true, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
 	assert.Equal(t, true, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
 	assert.Equal(t, true, "will", string(msg.WillTopic()), "Incorrect will topic value.")
 	assert.Equal(t, true, "send me home", string(msg.WillMessage()), "Incorrect will message value.")

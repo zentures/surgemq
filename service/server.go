@@ -107,7 +107,10 @@ type Server struct {
 	running int32
 
 	// A indicator on whether this server has already checked configuration
-	configed int32
+	configOnce sync.Once
+
+	subs []interface{}
+	qoss []byte
 }
 
 // ListenAndServe listents to connections on the URI requested, and handles any
@@ -170,6 +173,43 @@ func (this *Server) ListenAndServe(uri string) error {
 
 		go this.handleConnection(conn)
 	}
+}
+
+// Publish sends a single MQTT PUBLISH message to the server. On completion, the
+// supplied OnCompleteFunc is called. For QOS 0 messages, onComplete is called
+// immediately after the message is sent to the outgoing buffer. For QOS 1 messages,
+// onComplete is called when PUBACK is received. For QOS 2 messages, onComplete is
+// called after the PUBCOMP message is received.
+func (this *Server) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
+	if err := this.checkConfiguration(); err != nil {
+		return err
+	}
+
+	if msg.Retain() {
+		if err := this.topicsMgr.Retain(msg); err != nil {
+			glog.Errorf("Error retaining message: %v", err)
+		}
+	}
+
+	if err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss); err != nil {
+		return err
+	}
+
+	msg.SetRetain(false)
+
+	//glog.Debugf("(server) Publishing to topic %q and %d subscribers", string(msg.Topic()), len(this.subs))
+	for _, s := range this.subs {
+		if s != nil {
+			fn, ok := s.(*OnPublishFunc)
+			if !ok {
+				glog.Errorf("Invalid onPublish Function")
+			} else {
+				(*fn)(msg)
+			}
+		}
+	}
+
+	return nil
 }
 
 // Close terminates the server by shutting down all the client connections and closing
@@ -304,56 +344,53 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 }
 
 func (this *Server) checkConfiguration() error {
-	if !atomic.CompareAndSwapInt32(&this.configed, 0, 1) {
-		return nil
-	}
-
 	var err error
 
-	if this.KeepAlive == 0 {
-		this.KeepAlive = DefaultKeepAlive
-	}
+	this.configOnce.Do(func() {
+		if this.KeepAlive == 0 {
+			this.KeepAlive = DefaultKeepAlive
+		}
 
-	if this.ConnectTimeout == 0 {
-		this.ConnectTimeout = DefaultConnectTimeout
-	}
+		if this.ConnectTimeout == 0 {
+			this.ConnectTimeout = DefaultConnectTimeout
+		}
 
-	if this.AckTimeout == 0 {
-		this.AckTimeout = DefaultAckTimeout
-	}
+		if this.AckTimeout == 0 {
+			this.AckTimeout = DefaultAckTimeout
+		}
 
-	if this.TimeoutRetries == 0 {
-		this.TimeoutRetries = DefaultTimeoutRetries
-	}
+		if this.TimeoutRetries == 0 {
+			this.TimeoutRetries = DefaultTimeoutRetries
+		}
 
-	if this.Authenticator == "" {
-		this.Authenticator = "mockSuccess"
-	}
+		if this.Authenticator == "" {
+			this.Authenticator = "mockSuccess"
+		}
 
-	this.authMgr, err = auth.NewManager(this.Authenticator)
-	if err != nil {
-		return err
-	}
+		this.authMgr, err = auth.NewManager(this.Authenticator)
+		if err != nil {
+			return
+		}
 
-	if this.SessionsProvider == "" {
-		this.SessionsProvider = "mem"
-	}
+		if this.SessionsProvider == "" {
+			this.SessionsProvider = "mem"
+		}
 
-	this.sessMgr, err = sessions.NewManager(this.SessionsProvider)
-	if err != nil {
-		return err
-	}
+		this.sessMgr, err = sessions.NewManager(this.SessionsProvider)
+		if err != nil {
+			return
+		}
 
-	if this.TopicsProvider == "" {
-		this.TopicsProvider = "mem"
-	}
+		if this.TopicsProvider == "" {
+			this.TopicsProvider = "mem"
+		}
 
-	this.topicsMgr, err = topics.NewManager(this.TopicsProvider)
-	if err != nil {
-		return err
-	}
+		this.topicsMgr, err = topics.NewManager(this.TopicsProvider)
 
-	return nil
+		return
+	})
+
+	return err
 }
 
 func (this *Server) getSession(svc *service, req *message.ConnectMessage, resp *message.ConnackMessage) error {

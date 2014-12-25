@@ -87,7 +87,7 @@ func TestServiceWillDelivery(t *testing.T) {
 			return nil
 		},
 		func(msg *message.PublishMessage) error {
-			assert.Equal(t, true, 1, msg.QoS())
+			assert.Equal(t, true, message.QosAtLeastOnce, msg.QoS())
 			assert.Equal(t, true, []byte("send me home"), msg.Payload())
 
 			will := atomic.AddInt64(&willdone, 1)
@@ -108,7 +108,7 @@ func TestServiceWillDelivery(t *testing.T) {
 			return nil
 		},
 		func(msg *message.PublishMessage) error {
-			assert.Equal(t, true, 1, msg.QoS())
+			assert.Equal(t, true, message.QosAtLeastOnce, msg.QoS())
 			assert.Equal(t, true, []byte("send me home"), msg.Payload())
 
 			will := atomic.AddInt64(&willdone, 1)
@@ -204,7 +204,7 @@ func TestServiceSub0Pub0(t *testing.T) {
 		done := make(chan struct{})
 		done2 := make(chan struct{})
 
-		count := uint16(0)
+		count := 0
 
 		sub := newSubscribeMessage(0)
 		svc.Subscribe(sub,
@@ -213,7 +213,7 @@ func TestServiceSub0Pub0(t *testing.T) {
 				return nil
 			},
 			func(msg *message.PublishMessage) error {
-				assertPublishMessage(t, msg, count, 0)
+				assertPublishMessage(t, msg, 0)
 
 				count++
 
@@ -255,7 +255,7 @@ func TestServiceSub1Pub0(t *testing.T) {
 		done := make(chan struct{})
 		done2 := make(chan struct{})
 
-		count := uint16(0)
+		count := 0
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
@@ -264,7 +264,7 @@ func TestServiceSub1Pub0(t *testing.T) {
 				return nil
 			},
 			func(msg *message.PublishMessage) error {
-				assertPublishMessage(t, msg, count, 0)
+				assertPublishMessage(t, msg, 0)
 
 				count++
 
@@ -372,7 +372,7 @@ func TestServiceSub1Pub1(t *testing.T) {
 		done2 := make(chan struct{})
 		done3 := make(chan struct{})
 
-		count := uint16(0)
+		count := 0
 		ackcnt := 0
 
 		sub := newSubscribeMessage(1)
@@ -384,7 +384,7 @@ func TestServiceSub1Pub1(t *testing.T) {
 			func(msg *message.PublishMessage) error {
 				count++
 
-				assertPublishMessage(t, msg, count, 1)
+				assertPublishMessage(t, msg, 1)
 
 				if count == 10 {
 					close(done2)
@@ -450,7 +450,7 @@ func TestServiceSub2Pub1(t *testing.T) {
 		done2 := make(chan struct{})
 		done3 := make(chan struct{})
 
-		count := uint16(0)
+		count := 0
 		ackcnt := 0
 
 		sub := newSubscribeMessage(2)
@@ -462,7 +462,7 @@ func TestServiceSub2Pub1(t *testing.T) {
 			func(msg *message.PublishMessage) error {
 				count++
 
-				assertPublishMessage(t, msg, count, 1)
+				assertPublishMessage(t, msg, 1)
 
 				if count == 10 {
 					close(done2)
@@ -593,7 +593,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 		done2 := make(chan struct{})
 		done3 := make(chan struct{})
 
-		count := uint16(0)
+		count := 0
 		ackcnt := 0
 
 		sub := newSubscribeMessage(2)
@@ -605,7 +605,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 			func(msg *message.PublishMessage) error {
 				count++
 
-				assertPublishMessage(t, msg, count, 2)
+				assertPublishMessage(t, msg, 2)
 
 				if count == 10 {
 					close(done2)
@@ -663,13 +663,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 	})
 }
 
-func assertPublishMessage(t *testing.T, msg *message.PublishMessage, pktid uint16, qos byte) {
+func assertPublishMessage(t *testing.T, msg *message.PublishMessage, qos byte) {
 	assert.Equal(t, true, "abc", string(msg.Payload()))
 	assert.Equal(t, true, qos, msg.QoS())
-
-	// this is difficult to test if both server and client are all in the same process,
-	// coz the pktid global variable is shared across both
-	//if qos != 0 {
-	//	assert.Equal(t, true, pktid, msg.PacketId())
-	//}
 }

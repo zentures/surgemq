@@ -62,10 +62,9 @@ func ExampleClient() {
 
 	// Creates a new PUBLISH message with the appropriate contents for publishing
 	pubmsg := message.NewPublishMessage()
-	pubmsg.SetPacketId(pktid)
 	pubmsg.SetTopic([]byte("abc"))
 	pubmsg.SetPayload(make([]byte, 1024))
-	pubmsg.SetQoS(qos)
+	pubmsg.SetQoS(0)
 
 	// Publishes to the server by sending the message
 	c.Publish(pubmsg, nil)

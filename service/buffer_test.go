@@ -118,7 +118,7 @@ func peekBuffer(t *testing.T, buf *buffer, n int) {
 	assert.Equal(t, true, n, len(pkbuf))
 
 	for _, b := range pkbuf {
-		assert.Equal(t, true, 'a', b)
+		assert.Equal(t, true, byte('a'), b)
 	}
 }
 
