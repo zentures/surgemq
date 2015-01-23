@@ -17,7 +17,7 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPubackMessageFields(t *testing.T) {
@@ -25,7 +25,7 @@ func TestPubackMessageFields(t *testing.T) {
 
 	msg.SetPacketId(100)
 
-	assert.Equal(t, true, 100, int(msg.PacketId()))
+	require.Equal(t, 100, int(msg.PacketId()))
 }
 
 func TestPubackMessageDecode(t *testing.T) {
@@ -39,10 +39,10 @@ func TestPubackMessageDecode(t *testing.T) {
 	msg := NewPubackMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, PUBACK, msg.Type(), "Error decoding message.")
-	assert.Equal(t, true, 7, int(msg.PacketId()), "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, PUBACK, msg.Type(), "Error decoding message.")
+	require.Equal(t, 7, int(msg.PacketId()), "Error decoding message.")
 }
 
 // test insufficient bytes
@@ -56,7 +56,7 @@ func TestPubackMessageDecode2(t *testing.T) {
 	msg := NewPubackMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestPubackMessageEncode(t *testing.T) {
@@ -73,9 +73,9 @@ func TestPubackMessageEncode(t *testing.T) {
 	dst := make([]byte, 10)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -91,18 +91,18 @@ func TestPubackDecodeEncodeEquiv(t *testing.T) {
 	msg := NewPubackMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
 
 	n3, err := msg.Decode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
 }

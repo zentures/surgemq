@@ -17,20 +17,20 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSubackMessageFields(t *testing.T) {
 	msg := NewSubackMessage()
 
 	msg.SetPacketId(100)
-	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting packet ID.")
+	require.Equal(t, 100, int(msg.PacketId()), "Error setting packet ID.")
 
 	msg.AddReturnCode(1)
-	assert.Equal(t, true, 1, len(msg.ReturnCodes()), "Error adding return code.")
+	require.Equal(t, 1, len(msg.ReturnCodes()), "Error adding return code.")
 
 	err := msg.AddReturnCode(0x90)
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestSubackMessageDecode(t *testing.T) {
@@ -48,10 +48,10 @@ func TestSubackMessageDecode(t *testing.T) {
 	msg := NewSubackMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, SUBACK, msg.Type(), "Error decoding message.")
-	assert.Equal(t, true, 4, len(msg.ReturnCodes()), "Error adding return code.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, SUBACK, msg.Type(), "Error decoding message.")
+	require.Equal(t, 4, len(msg.ReturnCodes()), "Error adding return code.")
 }
 
 // test with wrong return code
@@ -70,7 +70,7 @@ func TestSubackMessageDecode2(t *testing.T) {
 	msg := NewSubackMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestSubackMessageEncode(t *testing.T) {
@@ -95,9 +95,9 @@ func TestSubackMessageEncode(t *testing.T) {
 	dst := make([]byte, 10)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -117,18 +117,18 @@ func TestSubackDecodeEncodeEquiv(t *testing.T) {
 	msg := NewSubackMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
 
 	n3, err := msg.Decode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
 }

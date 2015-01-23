@@ -17,115 +17,115 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConnectMessageFields(t *testing.T) {
 	msg := NewConnectMessage()
 
 	err := msg.SetVersion(0x3)
-	assert.NoError(t, false, err, "Error setting message version.")
+	require.NoError(t, err, "Error setting message version.")
 
-	assert.Equal(t, false, 0x3, int(msg.Version()), "Incorrect version number")
+	require.Equal(t, 0x3, int(msg.Version()), "Incorrect version number")
 
 	err = msg.SetVersion(0x5)
-	assert.Error(t, false, err)
+	require.Error(t, err)
 
 	msg.SetCleanSession(true)
-	assert.True(t, false, msg.CleanSession(), "Error setting clean session flag.")
+	require.True(t, msg.CleanSession(), "Error setting clean session flag.")
 
 	msg.SetCleanSession(false)
-	assert.False(t, false, msg.CleanSession(), "Error setting clean session flag.")
+	require.False(t, msg.CleanSession(), "Error setting clean session flag.")
 
 	msg.SetWillFlag(true)
-	assert.True(t, false, msg.WillFlag(), "Error setting will flag.")
+	require.True(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillFlag(false)
-	assert.False(t, false, msg.WillFlag(), "Error setting will flag.")
+	require.False(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillRetain(true)
-	assert.True(t, false, msg.WillRetain(), "Error setting will retain.")
+	require.True(t, msg.WillRetain(), "Error setting will retain.")
 
 	msg.SetWillRetain(false)
-	assert.False(t, false, msg.WillRetain(), "Error setting will retain.")
+	require.False(t, msg.WillRetain(), "Error setting will retain.")
 
 	msg.SetPasswordFlag(true)
-	assert.True(t, false, msg.PasswordFlag(), "Error setting password flag.")
+	require.True(t, msg.PasswordFlag(), "Error setting password flag.")
 
 	msg.SetPasswordFlag(false)
-	assert.False(t, false, msg.PasswordFlag(), "Error setting password flag.")
+	require.False(t, msg.PasswordFlag(), "Error setting password flag.")
 
 	msg.SetUsernameFlag(true)
-	assert.True(t, false, msg.UsernameFlag(), "Error setting username flag.")
+	require.True(t, msg.UsernameFlag(), "Error setting username flag.")
 
 	msg.SetUsernameFlag(false)
-	assert.False(t, false, msg.UsernameFlag(), "Error setting username flag.")
+	require.False(t, msg.UsernameFlag(), "Error setting username flag.")
 
 	msg.SetWillQos(1)
-	assert.Equal(t, false, 1, int(msg.WillQos()), "Error setting will QoS.")
+	require.Equal(t, 1, int(msg.WillQos()), "Error setting will QoS.")
 
 	err = msg.SetWillQos(4)
-	assert.Error(t, false, err)
+	require.Error(t, err)
 
 	err = msg.SetClientId([]byte("j0j0jfajf02j0asdjf"))
-	assert.NoError(t, false, err, "Error setting client ID")
+	require.NoError(t, err, "Error setting client ID")
 
-	assert.Equal(t, false, "j0j0jfajf02j0asdjf", string(msg.ClientId()), "Error setting client ID.")
+	require.Equal(t, "j0j0jfajf02j0asdjf", string(msg.ClientId()), "Error setting client ID.")
 
 	err = msg.SetClientId([]byte("this is good for v3"))
-	assert.NoError(t, false, err)
+	require.NoError(t, err)
 
 	msg.SetVersion(0x4)
 
 	err = msg.SetClientId([]byte("this is no good for v4!"))
-	assert.Error(t, false, err)
+	require.Error(t, err)
 
 	msg.SetVersion(0x3)
 
 	msg.SetWillTopic([]byte("willtopic"))
-	assert.Equal(t, false, "willtopic", string(msg.WillTopic()), "Error setting will topic.")
+	require.Equal(t, "willtopic", string(msg.WillTopic()), "Error setting will topic.")
 
-	assert.True(t, false, msg.WillFlag(), "Error setting will flag.")
+	require.True(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillTopic([]byte(""))
-	assert.Equal(t, false, "", string(msg.WillTopic()), "Error setting will topic.")
+	require.Equal(t, "", string(msg.WillTopic()), "Error setting will topic.")
 
-	assert.False(t, false, msg.WillFlag(), "Error setting will flag.")
+	require.False(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillMessage([]byte("this is a will message"))
-	assert.Equal(t, false, "this is a will message", string(msg.WillMessage()), "Error setting will message.")
+	require.Equal(t, "this is a will message", string(msg.WillMessage()), "Error setting will message.")
 
-	assert.True(t, false, msg.WillFlag(), "Error setting will flag.")
+	require.True(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillMessage([]byte(""))
-	assert.Equal(t, false, "", string(msg.WillMessage()), "Error setting will topic.")
+	require.Equal(t, "", string(msg.WillMessage()), "Error setting will topic.")
 
-	assert.False(t, false, msg.WillFlag(), "Error setting will flag.")
+	require.False(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillTopic([]byte("willtopic"))
 	msg.SetWillMessage([]byte("this is a will message"))
 	msg.SetWillTopic([]byte(""))
-	assert.True(t, false, msg.WillFlag(), "Error setting will topic.")
+	require.True(t, msg.WillFlag(), "Error setting will topic.")
 
 	msg.SetUsername([]byte("myname"))
-	assert.Equal(t, false, "myname", string(msg.Username()), "Error setting will message.")
+	require.Equal(t, "myname", string(msg.Username()), "Error setting will message.")
 
-	assert.True(t, false, msg.UsernameFlag(), "Error setting will flag.")
+	require.True(t, msg.UsernameFlag(), "Error setting will flag.")
 
 	msg.SetUsername([]byte(""))
-	assert.Equal(t, false, "", string(msg.Username()), "Error setting will message.")
+	require.Equal(t, "", string(msg.Username()), "Error setting will message.")
 
-	assert.False(t, false, msg.UsernameFlag(), "Error setting will flag.")
+	require.False(t, msg.UsernameFlag(), "Error setting will flag.")
 
 	msg.SetPassword([]byte("myname"))
-	assert.Equal(t, false, "myname", string(msg.Password()), "Error setting will message.")
+	require.Equal(t, "myname", string(msg.Password()), "Error setting will message.")
 
-	assert.True(t, false, msg.PasswordFlag(), "Error setting will flag.")
+	require.True(t, msg.PasswordFlag(), "Error setting will flag.")
 
 	msg.SetPassword([]byte(""))
-	assert.Equal(t, false, "", string(msg.Password()), "Error setting will message.")
+	require.Equal(t, "", string(msg.Password()), "Error setting will message.")
 
-	assert.False(t, false, msg.PasswordFlag(), "Error setting will flag.")
+	require.False(t, msg.PasswordFlag(), "Error setting will flag.")
 }
 
 func TestConnectMessageDecode(t *testing.T) {
@@ -159,15 +159,15 @@ func TestConnectMessageDecode(t *testing.T) {
 	msg := NewConnectMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, 206, int(msg.connectFlags), "Incorrect flag value.")
-	assert.Equal(t, true, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
-	assert.Equal(t, true, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
-	assert.Equal(t, true, "will", string(msg.WillTopic()), "Incorrect will topic value.")
-	assert.Equal(t, true, "send me home", string(msg.WillMessage()), "Incorrect will message value.")
-	assert.Equal(t, true, "surgemq", string(msg.Username()), "Incorrect username value.")
-	assert.Equal(t, true, "verysecret", string(msg.Password()), "Incorrect password value.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, 206, int(msg.connectFlags), "Incorrect flag value.")
+	require.Equal(t, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
+	require.Equal(t, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
+	require.Equal(t, "will", string(msg.WillTopic()), "Incorrect will topic value.")
+	require.Equal(t, "send me home", string(msg.WillMessage()), "Incorrect will message value.")
+	require.Equal(t, "surgemq", string(msg.Username()), "Incorrect username value.")
+	require.Equal(t, "verysecret", string(msg.Password()), "Incorrect password value.")
 }
 
 func TestConnectMessageDecode2(t *testing.T) {
@@ -202,7 +202,7 @@ func TestConnectMessageDecode2(t *testing.T) {
 	msg := NewConnectMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestConnectMessageDecode3(t *testing.T) {
@@ -238,8 +238,8 @@ func TestConnectMessageDecode3(t *testing.T) {
 	msg := NewConnectMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, 62, n)
+	require.NoError(t, err)
+	require.Equal(t, 62, n)
 }
 
 func TestConnectMessageDecode4(t *testing.T) {
@@ -273,7 +273,7 @@ func TestConnectMessageDecode4(t *testing.T) {
 	msg := NewConnectMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestConnectMessageEncode(t *testing.T) {
@@ -318,9 +318,9 @@ func TestConnectMessageEncode(t *testing.T) {
 	dst := make([]byte, 100)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -356,18 +356,18 @@ func TestConnectDecodeEncodeEquiv(t *testing.T) {
 	msg := NewConnectMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
 
 	n3, err := msg.Decode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
 }

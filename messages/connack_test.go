@@ -17,20 +17,20 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConnackMessageFields(t *testing.T) {
 	msg := NewConnackMessage()
 
 	msg.SetSessionPresent(true)
-	assert.True(t, true, msg.SessionPresent(), "Error setting session present flag.")
+	require.True(t, msg.SessionPresent(), "Error setting session present flag.")
 
 	msg.SetSessionPresent(false)
-	assert.False(t, true, msg.SessionPresent(), "Error setting session present flag.")
+	require.False(t, msg.SessionPresent(), "Error setting session present flag.")
 
 	msg.SetReturnCode(ConnectionAccepted)
-	assert.Equal(t, true, ConnectionAccepted, msg.ReturnCode(), "Error setting return code.")
+	require.Equal(t, ConnectionAccepted, msg.ReturnCode(), "Error setting return code.")
 }
 
 func TestConnackMessageDecode(t *testing.T) {
@@ -45,10 +45,10 @@ func TestConnackMessageDecode(t *testing.T) {
 
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.False(t, true, msg.SessionPresent(), "Error decoding session present flag.")
-	assert.Equal(t, true, ConnectionAccepted, msg.ReturnCode(), "Error decoding return code.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.False(t, msg.SessionPresent(), "Error decoding session present flag.")
+	require.Equal(t, ConnectionAccepted, msg.ReturnCode(), "Error decoding return code.")
 }
 
 // testing wrong message length
@@ -63,7 +63,7 @@ func TestConnackMessageDecode2(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	assert.Error(t, true, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding message.")
 }
 
 // testing wrong message size
@@ -77,7 +77,7 @@ func TestConnackMessageDecode3(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	assert.Error(t, true, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding message.")
 }
 
 // testing wrong reserve bits
@@ -92,7 +92,7 @@ func TestConnackMessageDecode4(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	assert.Error(t, true, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding message.")
 }
 
 // testing invalid return code
@@ -107,7 +107,7 @@ func TestConnackMessageDecode5(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	assert.Error(t, true, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding message.")
 }
 
 func TestConnackMessageEncode(t *testing.T) {
@@ -125,9 +125,9 @@ func TestConnackMessageEncode(t *testing.T) {
 	dst := make([]byte, 10)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error encoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error encoding connack message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error encoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error encoding connack message.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -143,18 +143,18 @@ func TestConnackDecodeEncodeEquiv(t *testing.T) {
 	msg := NewConnackMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
 
 	n3, err := msg.Decode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
 }
