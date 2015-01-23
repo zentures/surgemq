@@ -17,25 +17,25 @@ package auth
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMockSuccessAuthenticator(t *testing.T) {
-	assert.NoError(t, true, mockSuccessAuthenticator.Authenticate("", ""))
+	require.NoError(t, mockSuccessAuthenticator.Authenticate("", ""))
 
-	assert.NoError(t, true, providers["mockSuccess"].Authenticate("", ""))
+	require.NoError(t, providers["mockSuccess"].Authenticate("", ""))
 
 	mgr, err := NewManager("mockSuccess")
-	assert.NoError(t, true, err)
-	assert.NoError(t, true, mgr.Authenticate("", ""))
+	require.NoError(t, err)
+	require.NoError(t, mgr.Authenticate("", ""))
 }
 
 func TestMockFailureAuthenticator(t *testing.T) {
-	assert.Error(t, true, mockFailureAuthenticator.Authenticate("", ""))
+	require.Error(t, mockFailureAuthenticator.Authenticate("", ""))
 
-	assert.Error(t, true, providers["mockFailure"].Authenticate("", ""))
+	require.Error(t, providers["mockFailure"].Authenticate("", ""))
 
 	mgr, err := NewManager("mockFailure")
-	assert.NoError(t, true, err)
-	assert.Error(t, true, mgr.Authenticate("", ""))
+	require.NoError(t, err)
+	require.Error(t, mgr.Authenticate("", ""))
 }

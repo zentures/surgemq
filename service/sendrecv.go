@@ -21,8 +21,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
+	"github.com/surgebase/glog"
 )
 
 // receiver() reads data from the network, and writes the data into the incoming buffer

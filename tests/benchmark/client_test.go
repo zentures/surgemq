@@ -20,7 +20,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/service"
 )
@@ -82,7 +82,7 @@ func connectToServer(t testing.TB, uri string, cid int) *service.Client {
 	msg := newConnectMessage(cid)
 
 	err := c.Connect(uri, msg)
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	return c
 }

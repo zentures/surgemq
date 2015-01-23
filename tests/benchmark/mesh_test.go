@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dataence/glog"
+	"github.com/surgebase/glog"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/service"
 )

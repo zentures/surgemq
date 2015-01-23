@@ -25,7 +25,7 @@ import (
 	"time"
 
 	MQTT "git.eclipse.org/gitroot/paho/org.eclipse.paho.mqtt.golang.git"
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var f MQTT.MessageHandler = func(client *MQTT.MqttClient, msg MQTT.Message) {
@@ -41,7 +41,7 @@ func TestPahoGoClient(t *testing.T) {
 
 	uri := "tcp://127.0.0.1:1883"
 	u, err := url.Parse(uri)
-	assert.NoError(t, true, err, "Error parsing URL")
+	require.NoError(t, err, "Error parsing URL")
 
 	// Start listener
 	wg.Add(1)
@@ -54,17 +54,17 @@ func TestPahoGoClient(t *testing.T) {
 
 	c := MQTT.NewClient(opts)
 	_, err = c.Start()
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	filter, _ := MQTT.NewTopicFilter("/go-mqtt/sample", 0)
 	receipt, err := c.StartSubscription(nil, filter)
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	select {
 	case <-receipt:
 
 	case <-time.After(time.Millisecond * 100):
-		assert.Fail(t, true, "Test timed out")
+		require.FailNow(t, "Test timed out")
 	}
 
 	for i := 0; i < 100; i++ {
@@ -75,20 +75,20 @@ func TestPahoGoClient(t *testing.T) {
 		case <-receipt:
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Test timed out")
+			require.FailNow(t, "Test timed out")
 		}
 	}
 
 	time.Sleep(3 * time.Second)
 
 	receipt, err = c.EndSubscription("/go-mqtt/sample")
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	select {
 	case <-receipt:
 
 	case <-time.After(time.Millisecond * 100):
-		assert.Fail(t, true, "Test timed out")
+		require.FailNow(t, "Test timed out")
 	}
 
 	c.Disconnect(250)

@@ -17,46 +17,46 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPublishMessageHeaderFields(t *testing.T) {
 	msg := NewPublishMessage()
 	msg.mtypeflags[0] |= 11
 
-	assert.True(t, true, msg.Dup(), "Incorrect DUP flag.")
-	assert.True(t, true, msg.Retain(), "Incorrect RETAIN flag.")
-	assert.Equal(t, true, 1, int(msg.QoS()), "Incorrect QoS.")
+	require.True(t, msg.Dup(), "Incorrect DUP flag.")
+	require.True(t, msg.Retain(), "Incorrect RETAIN flag.")
+	require.Equal(t, 1, int(msg.QoS()), "Incorrect QoS.")
 
 	msg.SetDup(false)
 
-	assert.False(t, true, msg.Dup(), "Incorrect DUP flag.")
+	require.False(t, msg.Dup(), "Incorrect DUP flag.")
 
 	msg.SetRetain(false)
 
-	assert.False(t, true, msg.Retain(), "Incorrect RETAIN flag.")
+	require.False(t, msg.Retain(), "Incorrect RETAIN flag.")
 
 	err := msg.SetQoS(2)
 
-	assert.NoError(t, true, err, "Error setting QoS.")
-	assert.Equal(t, true, 2, int(msg.QoS()), "Incorrect QoS.")
+	require.NoError(t, err, "Error setting QoS.")
+	require.Equal(t, 2, int(msg.QoS()), "Incorrect QoS.")
 
 	err = msg.SetQoS(3)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 
 	err = msg.SetQoS(0)
 
-	assert.NoError(t, true, err, "Error setting QoS.")
-	assert.Equal(t, true, 0, int(msg.QoS()), "Incorrect QoS.")
+	require.NoError(t, err, "Error setting QoS.")
+	require.Equal(t, 0, int(msg.QoS()), "Incorrect QoS.")
 
 	msg.SetDup(true)
 
-	assert.True(t, true, msg.Dup(), "Incorrect DUP flag.")
+	require.True(t, msg.Dup(), "Incorrect DUP flag.")
 
 	msg.SetRetain(true)
 
-	assert.True(t, true, msg.Retain(), "Incorrect RETAIN flag.")
+	require.True(t, msg.Retain(), "Incorrect RETAIN flag.")
 }
 
 func TestPublishMessageFields(t *testing.T) {
@@ -64,19 +64,19 @@ func TestPublishMessageFields(t *testing.T) {
 
 	msg.SetTopic([]byte("coolstuff"))
 
-	assert.Equal(t, true, "coolstuff", string(msg.Topic()), "Error setting message topic.")
+	require.Equal(t, "coolstuff", string(msg.Topic()), "Error setting message topic.")
 
 	err := msg.SetTopic([]byte("coolstuff/#"))
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 
 	msg.SetPacketId(100)
 
-	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting acket ID.")
+	require.Equal(t, 100, int(msg.PacketId()), "Error setting acket ID.")
 
 	msg.SetPayload([]byte("this is a payload to be sent"))
 
-	assert.Equal(t, true, []byte("this is a payload to be sent"), msg.Payload(), "Error setting payload.")
+	require.Equal(t, []byte("this is a payload to be sent"), msg.Payload(), "Error setting payload.")
 }
 
 func TestPublishMessageDecode1(t *testing.T) {
@@ -94,11 +94,11 @@ func TestPublishMessageDecode1(t *testing.T) {
 	msg := NewPublishMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, 7, int(msg.PacketId()), "Error decoding message.")
-	assert.Equal(t, true, "surgemq", string(msg.Topic()), "Error deocding topic name.")
-	assert.Equal(t, true, []byte{'s', 'e', 'n', 'd', ' ', 'm', 'e', ' ', 'h', 'o', 'm', 'e'}, msg.Payload(), "Error deocding payload.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, 7, int(msg.PacketId()), "Error decoding message.")
+	require.Equal(t, "surgemq", string(msg.Topic()), "Error deocding topic name.")
+	require.Equal(t, []byte{'s', 'e', 'n', 'd', ' ', 'm', 'e', ' ', 'h', 'o', 'm', 'e'}, msg.Payload(), "Error deocding payload.")
 }
 
 // test insufficient bytes
@@ -117,7 +117,7 @@ func TestPublishMessageDecode2(t *testing.T) {
 	msg := NewPublishMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 // test qos = 0 and no client id
@@ -134,7 +134,7 @@ func TestPublishMessageDecode3(t *testing.T) {
 	msg := NewPublishMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
 }
 
 func TestPublishMessageEncode(t *testing.T) {
@@ -158,9 +158,9 @@ func TestPublishMessageEncode(t *testing.T) {
 	dst := make([]byte, 100)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test empty topic name
@@ -172,7 +172,7 @@ func TestPublishMessageEncode2(t *testing.T) {
 
 	dst := make([]byte, 100)
 	_, err := msg.Encode(dst)
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 // test encoding qos = 0 and no packet id
@@ -194,9 +194,9 @@ func TestPublishMessageEncode3(t *testing.T) {
 	dst := make([]byte, 100)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test large message
@@ -218,14 +218,14 @@ func TestPublishMessageEncode4(t *testing.T) {
 	msg.SetQoS(0)
 	msg.SetPayload(payload)
 
-	assert.Equal(t, true, len(msgBytes), msg.Len())
+	require.Equal(t, len(msgBytes), msg.Len())
 
 	dst := make([]byte, 1100)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test from github issue #2, @mrdg
@@ -235,15 +235,15 @@ func TestPublishDecodeEncodeEquiv2(t *testing.T) {
 	msg := NewPublishMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -264,18 +264,18 @@ func TestPublishDecodeEncodeEquiv(t *testing.T) {
 
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
 
 	n3, err := msg.Decode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
 }

@@ -20,9 +20,9 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/sessions"
+	"github.com/surgebase/glog"
 )
 
 var (
@@ -34,13 +34,13 @@ func (this *service) processor() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			glog.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			//glog.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 		this.stop()
 
-		glog.Debugf("(%s) Stopping processor", this.cid())
+		//glog.Debugf("(%s) Stopping processor", this.cid())
 	}()
 
 	glog.Debugf("(%s) Starting processor", this.cid())

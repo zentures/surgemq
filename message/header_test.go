@@ -17,7 +17,7 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMessageHeaderFields(t *testing.T) {
@@ -25,26 +25,26 @@ func TestMessageHeaderFields(t *testing.T) {
 
 	header.SetRemainingLength(33)
 
-	assert.Equal(t, true, 33, header.RemainingLength())
+	require.Equal(t, 33, header.RemainingLength())
 
 	err := header.SetRemainingLength(268435456)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 
 	err = header.SetRemainingLength(-1)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 
 	err = header.SetType(RESERVED)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 
 	err = header.SetType(PUBREL)
 
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, PUBREL, header.Type())
-	assert.Equal(t, true, "PUBREL", header.Name())
-	assert.Equal(t, true, 2, int(header.Flags()))
+	require.NoError(t, err)
+	require.Equal(t, PUBREL, header.Type())
+	require.Equal(t, "PUBREL", header.Name())
+	require.Equal(t, 2, int(header.Flags()))
 }
 
 // Not enough bytes
@@ -53,7 +53,7 @@ func TestMessageHeaderDecode(t *testing.T) {
 	header := &header{}
 
 	_, err := header.decode(buf)
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 // Remaining length too big
@@ -62,7 +62,7 @@ func TestMessageHeaderDecode2(t *testing.T) {
 	header := &header{}
 
 	_, err := header.decode(buf)
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestMessageHeaderDecode3(t *testing.T) {
@@ -70,7 +70,7 @@ func TestMessageHeaderDecode3(t *testing.T) {
 	header := &header{}
 
 	_, err := header.decode(buf)
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestMessageHeaderDecode4(t *testing.T) {
@@ -83,9 +83,9 @@ func TestMessageHeaderDecode4(t *testing.T) {
 
 	n, err := header.decode(buf)
 
-	assert.Error(t, true, err)
-	assert.Equal(t, true, 5, n)
-	assert.Equal(t, true, maxRemainingLength, header.RemainingLength())
+	require.Error(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, maxRemainingLength, header.RemainingLength())
 }
 
 func TestMessageHeaderDecode5(t *testing.T) {
@@ -97,8 +97,8 @@ func TestMessageHeaderDecode5(t *testing.T) {
 	}
 
 	n, err := header.decode(buf)
-	assert.Error(t, true, err)
-	assert.Equal(t, true, 3, n)
+	require.Error(t, err)
+	require.Equal(t, 3, n)
 }
 
 func TestMessageHeaderEncode1(t *testing.T) {
@@ -107,32 +107,32 @@ func TestMessageHeaderEncode1(t *testing.T) {
 
 	err := header.SetType(PUBREL)
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	err = header.SetRemainingLength(321)
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	buf := make([]byte, 3)
 	n, err := header.encode(buf)
 
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, 3, n)
-	assert.Equal(t, true, headerBytes, buf)
+	require.NoError(t, err)
+	require.Equal(t, 3, n)
+	require.Equal(t, headerBytes, buf)
 }
 
 func TestMessageHeaderEncode2(t *testing.T) {
 	header := &header{}
 
 	err := header.SetType(PUBREL)
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	header.remlen = 268435456
 
 	buf := make([]byte, 5)
 	_, err = header.encode(buf)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestMessageHeaderEncode3(t *testing.T) {
@@ -141,18 +141,18 @@ func TestMessageHeaderEncode3(t *testing.T) {
 
 	err := header.SetType(PUBREL)
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	err = header.SetRemainingLength(maxRemainingLength)
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	buf := make([]byte, 5)
 	n, err := header.encode(buf)
 
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, 5, n)
-	assert.Equal(t, true, headerBytes, buf)
+	require.NoError(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, headerBytes, buf)
 }
 
 func TestMessageHeaderEncode4(t *testing.T) {
@@ -164,7 +164,7 @@ func TestMessageHeaderEncode4(t *testing.T) {
 
 	buf := make([]byte, 5)
 	_, err := header.encode(buf)
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 /*

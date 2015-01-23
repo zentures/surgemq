@@ -17,20 +17,20 @@ package sessions
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/surge/surgemq/message"
 )
 
 func TestAckQueueOutOfOrder(t *testing.T) {
 	q := newAckqueue(5)
-	assert.Equal(t, true, 8, q.cap())
+	require.Equal(t, 8, q.cap())
 
 	for i := 0; i < 12; i++ {
 		msg := newPublishMessage(uint16(i), 1)
 		q.Wait(msg, nil)
 	}
 
-	assert.Equal(t, true, 12, q.len())
+	require.Equal(t, 12, q.len())
 
 	ack1 := message.NewPubackMessage()
 	ack1.SetPacketId(1)
@@ -38,7 +38,7 @@ func TestAckQueueOutOfOrder(t *testing.T) {
 
 	acked := q.Acked()
 
-	assert.Equal(t, true, 0, len(acked))
+	require.Equal(t, 0, len(acked))
 
 	ack0 := message.NewPubackMessage()
 	ack0.SetPacketId(0)
@@ -46,5 +46,5 @@ func TestAckQueueOutOfOrder(t *testing.T) {
 
 	acked = q.Acked()
 
-	assert.Equal(t, true, 2, len(acked))
+	require.Equal(t, 2, len(acked))
 }

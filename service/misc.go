@@ -20,14 +20,13 @@ import (
 	"io"
 	"net"
 
-	"github.com/dataence/glog"
 	"github.com/surge/surgemq/message"
 )
 
 func getConnectMessage(conn io.Closer) (*message.ConnectMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
-		glog.Debugf("Receive error: %v", err)
+		//glog.Debugf("Receive error: %v", err)
 		return nil, err
 	}
 
@@ -41,7 +40,7 @@ func getConnectMessage(conn io.Closer) (*message.ConnectMessage, error) {
 func getConnackMessage(conn io.Closer) (*message.ConnackMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
-		glog.Debugf("Receive error: %v", err)
+		//glog.Debugf("Receive error: %v", err)
 		return nil, err
 	}
 
@@ -56,7 +55,7 @@ func writeMessage(conn io.Closer, msg message.Message) error {
 	buf := make([]byte, msg.Len())
 	_, err := msg.Encode(buf)
 	if err != nil {
-		glog.Debugf("Write error: %v", err)
+		//glog.Debugf("Write error: %v", err)
 		return err
 	}
 	//glog.Debugf("Writing: %s", msg)
@@ -94,7 +93,7 @@ func getMessageBuffer(c io.Closer) ([]byte, error) {
 
 		n, err := conn.Read(b[0:])
 		if err != nil {
-			glog.Debugf("Read error: %v", err)
+			//glog.Debugf("Read error: %v", err)
 			return nil, err
 		}
 

@@ -20,8 +20,6 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
-
-	"github.com/dataence/glog"
 )
 
 var (
@@ -206,7 +204,7 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 
 func (this *buffer) Read(p []byte) (int, error) {
 	if this.isDone() && this.Len() == 0 {
-		glog.Debugf("isDone and len = %d", this.Len())
+		//glog.Debugf("isDone and len = %d", this.Len())
 		return 0, io.EOF
 	}
 

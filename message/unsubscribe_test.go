@@ -17,28 +17,28 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnsubscribeMessageFields(t *testing.T) {
 	msg := NewUnsubscribeMessage()
 
 	msg.SetPacketId(100)
-	assert.Equal(t, true, 100, int(msg.PacketId()), "Error setting packet ID.")
+	require.Equal(t, 100, int(msg.PacketId()), "Error setting packet ID.")
 
 	msg.AddTopic([]byte("/a/b/#/c"))
-	assert.Equal(t, true, 1, len(msg.Topics()), "Error adding topic.")
+	require.Equal(t, 1, len(msg.Topics()), "Error adding topic.")
 
 	msg.AddTopic([]byte("/a/b/#/c"))
-	assert.Equal(t, true, 1, len(msg.Topics()), "Error adding duplicate topic.")
+	require.Equal(t, 1, len(msg.Topics()), "Error adding duplicate topic.")
 
 	msg.RemoveTopic([]byte("/a/b/#/c"))
-	assert.False(t, true, msg.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
+	require.False(t, msg.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
 
-	assert.False(t, true, msg.TopicExists([]byte("a/b")), "Topic should not exist.")
+	require.False(t, msg.TopicExists([]byte("a/b")), "Topic should not exist.")
 
 	msg.RemoveTopic([]byte("/a/b/#/c"))
-	assert.False(t, true, msg.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
+	require.False(t, msg.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
 }
 
 func TestUnsubscribeMessageDecode(t *testing.T) {
@@ -61,13 +61,13 @@ func TestUnsubscribeMessageDecode(t *testing.T) {
 	msg := NewUnsubscribeMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, UNSUBSCRIBE, msg.Type(), "Error decoding message.")
-	assert.Equal(t, true, 3, len(msg.Topics()), "Error decoding topics.")
-	assert.True(t, true, msg.TopicExists([]byte("surgemq")), "Topic 'surgemq' should exist.")
-	assert.True(t, true, msg.TopicExists([]byte("/a/b/#/c")), "Topic '/a/b/#/c' should exist.")
-	assert.True(t, true, msg.TopicExists([]byte("/a/b/#/cdd")), "Topic '/a/b/#/c' should exist.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, UNSUBSCRIBE, msg.Type(), "Error decoding message.")
+	require.Equal(t, 3, len(msg.Topics()), "Error decoding topics.")
+	require.True(t, msg.TopicExists([]byte("surgemq")), "Topic 'surgemq' should exist.")
+	require.True(t, msg.TopicExists([]byte("/a/b/#/c")), "Topic '/a/b/#/c' should exist.")
+	require.True(t, msg.TopicExists([]byte("/a/b/#/cdd")), "Topic '/a/b/#/c' should exist.")
 }
 
 // test empty topic list
@@ -82,7 +82,7 @@ func TestUnsubscribeMessageDecode2(t *testing.T) {
 	msg := NewUnsubscribeMessage()
 	_, err := msg.Decode(msgBytes)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 func TestUnsubscribeMessageEncode(t *testing.T) {
@@ -111,9 +111,9 @@ func TestUnsubscribeMessageEncode(t *testing.T) {
 	dst := make([]byte, 100)
 	n, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -138,18 +138,18 @@ func TestUnsubscribeDecodeEncodeEquiv(t *testing.T) {
 	msg := NewUnsubscribeMessage()
 	n, err := msg.Decode(msgBytes)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n2, "Error decoding message.")
-	assert.Equal(t, true, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
 
 	n3, err := msg.Decode(dst)
 
-	assert.NoError(t, true, err, "Error decoding message.")
-	assert.Equal(t, true, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
 }

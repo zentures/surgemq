@@ -17,7 +17,7 @@ package message
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -71,9 +71,9 @@ func TestReadLPBytes(t *testing.T) {
 	for _, str := range lpstrings {
 		b, n, err := readLPBytes(lpstringBytes[total:])
 
-		assert.NoError(t, true, err)
-		assert.Equal(t, true, str, string(b))
-		assert.Equal(t, true, len(str)+2, n)
+		require.NoError(t, err)
+		require.Equal(t, str, string(b))
+		require.Equal(t, len(str)+2, n)
 
 		total += n
 	}
@@ -86,13 +86,13 @@ func TestWriteLPBytes(t *testing.T) {
 	for _, str := range lpstrings {
 		n, err := writeLPBytes(buf[total:], []byte(str))
 
-		assert.NoError(t, true, err)
-		assert.Equal(t, true, 2+len(str), n)
+		require.NoError(t, err)
+		require.Equal(t, 2+len(str), n)
 
 		total += n
 	}
 
-	assert.Equal(t, true, lpstringBytes, buf[:total])
+	require.Equal(t, lpstringBytes, buf[:total])
 }
 
 func TestMessageTypes(t *testing.T) {
@@ -122,15 +122,15 @@ func TestQosCodes(t *testing.T) {
 }
 
 func TestConnackReturnCodes(t *testing.T) {
-	assert.Equal(t, false, ErrInvalidProtocolVersion.Error(), ConnackCode(1).Error(), "Incorrect ConnackCode error value.")
+	require.Equal(t, ErrInvalidProtocolVersion.Error(), ConnackCode(1).Error(), "Incorrect ConnackCode error value.")
 
-	assert.Equal(t, false, ErrIdentifierRejected.Error(), ConnackCode(2).Error(), "Incorrect ConnackCode error value.")
+	require.Equal(t, ErrIdentifierRejected.Error(), ConnackCode(2).Error(), "Incorrect ConnackCode error value.")
 
-	assert.Equal(t, false, ErrServerUnavailable.Error(), ConnackCode(3).Error(), "Incorrect ConnackCode error value.")
+	require.Equal(t, ErrServerUnavailable.Error(), ConnackCode(3).Error(), "Incorrect ConnackCode error value.")
 
-	assert.Equal(t, false, ErrBadUsernameOrPassword.Error(), ConnackCode(4).Error(), "Incorrect ConnackCode error value.")
+	require.Equal(t, ErrBadUsernameOrPassword.Error(), ConnackCode(4).Error(), "Incorrect ConnackCode error value.")
 
-	assert.Equal(t, false, ErrNotAuthorized.Error(), ConnackCode(5).Error(), "Incorrect ConnackCode error value.")
+	require.Equal(t, ErrNotAuthorized.Error(), ConnackCode(5).Error(), "Incorrect ConnackCode error value.")
 }
 
 func TestFixedHeaderFlags(t *testing.T) {

@@ -19,7 +19,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/surge/surgemq/message"
 )
 
@@ -55,25 +55,25 @@ func TestReadMessageSuccess(t *testing.T) {
 
 	m, n, err := svc.readMessage(message.CONNECT, 62)
 
-	assert.NoError(t, true, err, "Error decoding message.")
+	require.NoError(t, err, "Error decoding message.")
 
-	assert.Equal(t, true, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 
 	msg := m.(*message.ConnectMessage)
 
-	assert.Equal(t, true, message.QosAtLeastOnce, msg.WillQos(), "Incorrect Will QoS")
+	require.Equal(t, message.QosAtLeastOnce, msg.WillQos(), "Incorrect Will QoS")
 
-	assert.Equal(t, true, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
+	require.Equal(t, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
 
-	assert.Equal(t, true, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
+	require.Equal(t, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
 
-	assert.Equal(t, true, "will", string(msg.WillTopic()), "Incorrect will topic value.")
+	require.Equal(t, "will", string(msg.WillTopic()), "Incorrect will topic value.")
 
-	assert.Equal(t, true, "send me home", string(msg.WillMessage()), "Incorrect will message value.")
+	require.Equal(t, "send me home", string(msg.WillMessage()), "Incorrect will message value.")
 
-	assert.Equal(t, true, "surgemq", string(msg.Username()), "Incorrect username value.")
+	require.Equal(t, "surgemq", string(msg.Username()), "Incorrect username value.")
 
-	assert.Equal(t, true, "verysecret", string(msg.Password()), "Incorrect password value.")
+	require.Equal(t, "verysecret", string(msg.Password()), "Incorrect password value.")
 }
 
 // Wrong messag type
@@ -109,7 +109,7 @@ func TestReadMessageError(t *testing.T) {
 
 	_, _, err := svc.readMessage(message.CONNECT, 62)
 
-	assert.Error(t, true, err)
+	require.Error(t, err)
 }
 
 // Wrong messag size
@@ -145,7 +145,7 @@ func TestReadMessageError2(t *testing.T) {
 
 	_, _, err := svc.readMessage(message.CONNECT, 64)
 
-	assert.Equal(t, true, io.EOF, err)
+	require.Equal(t, io.EOF, err)
 }
 
 func TestWriteMessage(t *testing.T) {
@@ -183,19 +183,19 @@ func TestWriteMessage(t *testing.T) {
 	svc := &service{}
 	svc.out, err = newBuffer(16384)
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	n, err := svc.writeMessage(msg)
 
-	assert.NoError(t, true, err, "error decoding message.")
+	require.NoError(t, err, "error decoding message.")
 
-	assert.Equal(t, true, len(msgBytes), n, "error decoding message.")
+	require.Equal(t, len(msgBytes), n, "error decoding message.")
 
 	dst, err := svc.out.ReadPeek(len(msgBytes))
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, true, msgBytes, dst, "error decoding message.")
+	require.Equal(t, msgBytes, dst, "error decoding message.")
 }
 
 func newTestBuffer(t *testing.T, msgBytes []byte) *service {
@@ -205,12 +205,12 @@ func newTestBuffer(t *testing.T, msgBytes []byte) *service {
 
 	svc.in, err = newBuffer(16384)
 
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	l, err := svc.in.ReadFrom(buf)
 
-	assert.Equal(t, true, io.EOF, err)
-	assert.Equal(t, true, len(msgBytes), l)
+	require.Equal(t, io.EOF, err)
+	require.Equal(t, len(msgBytes), l)
 
 	return svc
 }

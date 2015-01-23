@@ -24,8 +24,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/dataence/assert"
-	"github.com/dataence/glog"
+	"github.com/stretchr/testify/require"
+	"github.com/surgebase/glog"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/sessions"
 	"github.com/surge/surgemq/topics"
@@ -43,7 +43,7 @@ func runClientServerTests(t testing.TB, f func(*Client)) {
 
 	uri := "tcp://127.0.0.1:1883"
 	u, err := url.Parse(uri)
-	assert.NoError(t, true, err, "Error parsing URL")
+	require.NoError(t, err, "Error parsing URL")
 
 	// Start listener
 	wg.Add(1)
@@ -81,7 +81,7 @@ func startServiceN(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 
 	sessions.Register("mem", sp)
 
 	ln, err := net.Listen(u.Scheme, u.Host)
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 	defer ln.Close()
 
 	close(ready1)
@@ -92,14 +92,14 @@ func startServiceN(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 
 
 	for i := 0; i < cnt; i++ {
 		conn, err := ln.Accept()
-		assert.NoError(t, true, err)
+		require.NoError(t, err)
 
 		_, err = svr.handleConnection(conn)
 		if authenticator == "mockFailure" {
-			assert.Error(t, true, err)
+			require.Error(t, err)
 			return
 		} else {
-			assert.NoError(t, true, err)
+			require.NoError(t, err)
 		}
 	}
 
@@ -123,10 +123,10 @@ func connectToServer(t testing.TB, uri string) *Client {
 
 	err := c.Connect(uri, msg)
 	if authenticator == "mockFailure" {
-		assert.Error(t, true, err)
+		require.Error(t, err)
 		return nil
 	} else {
-		assert.NoError(t, true, err)
+		require.NoError(t, err)
 	}
 
 	return c

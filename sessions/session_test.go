@@ -17,7 +17,7 @@ package sessions
 import (
 	"testing"
 
-	"github.com/dataence/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/surge/surgemq/message"
 )
 
@@ -26,60 +26,60 @@ func TestSessionInit(t *testing.T) {
 	cmsg := newConnectMessage()
 
 	err := sess.Init(cmsg)
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, len(sess.cbuf), cmsg.Len())
-	assert.Equal(t, true, cmsg.WillQos(), sess.Cmsg.WillQos())
-	assert.Equal(t, true, cmsg.Version(), sess.Cmsg.Version())
-	assert.Equal(t, true, cmsg.CleanSession(), sess.Cmsg.CleanSession())
-	assert.Equal(t, true, cmsg.ClientId(), sess.Cmsg.ClientId())
-	assert.Equal(t, true, cmsg.KeepAlive(), sess.Cmsg.KeepAlive())
-	assert.Equal(t, true, cmsg.WillTopic(), sess.Cmsg.WillTopic())
-	assert.Equal(t, true, cmsg.WillMessage(), sess.Cmsg.WillMessage())
-	assert.Equal(t, true, cmsg.Username(), sess.Cmsg.Username())
-	assert.Equal(t, true, cmsg.Password(), sess.Cmsg.Password())
-	assert.Equal(t, true, []byte("will"), sess.Will.Topic())
-	assert.Equal(t, true, cmsg.WillQos(), sess.Will.QoS())
+	require.NoError(t, err)
+	require.Equal(t, len(sess.cbuf), cmsg.Len())
+	require.Equal(t, cmsg.WillQos(), sess.Cmsg.WillQos())
+	require.Equal(t, cmsg.Version(), sess.Cmsg.Version())
+	require.Equal(t, cmsg.CleanSession(), sess.Cmsg.CleanSession())
+	require.Equal(t, cmsg.ClientId(), sess.Cmsg.ClientId())
+	require.Equal(t, cmsg.KeepAlive(), sess.Cmsg.KeepAlive())
+	require.Equal(t, cmsg.WillTopic(), sess.Cmsg.WillTopic())
+	require.Equal(t, cmsg.WillMessage(), sess.Cmsg.WillMessage())
+	require.Equal(t, cmsg.Username(), sess.Cmsg.Username())
+	require.Equal(t, cmsg.Password(), sess.Cmsg.Password())
+	require.Equal(t, []byte("will"), sess.Will.Topic())
+	require.Equal(t, cmsg.WillQos(), sess.Will.QoS())
 
 	sess.AddTopic("test", 1)
-	assert.Equal(t, true, 1, len(sess.topics))
+	require.Equal(t, 1, len(sess.topics))
 
 	topics, qoss, err := sess.Topics()
-	assert.NoError(t, true, err)
-	assert.Equal(t, true, 1, len(topics))
-	assert.Equal(t, true, 1, len(qoss))
-	assert.Equal(t, true, "test", topics[0])
-	assert.Equal(t, true, 1, int(qoss[0]))
+	require.NoError(t, err)
+	require.Equal(t, 1, len(topics))
+	require.Equal(t, 1, len(qoss))
+	require.Equal(t, "test", topics[0])
+	require.Equal(t, 1, int(qoss[0]))
 
 	sess.RemoveTopic("test")
-	assert.Equal(t, true, 0, len(sess.topics))
+	require.Equal(t, 0, len(sess.topics))
 }
 
 func TestSessionPublishAckqueue(t *testing.T) {
 	sess := &Session{}
 	cmsg := newConnectMessage()
 	err := sess.Init(cmsg)
-	assert.NoError(t, true, err)
+	require.NoError(t, err)
 
 	for i := 0; i < 12; i++ {
 		msg := newPublishMessage(uint16(i), 1)
 		sess.Pub1ack.Wait(msg, nil)
 	}
 
-	assert.Equal(t, true, 12, sess.Pub1ack.len())
+	require.Equal(t, 12, sess.Pub1ack.len())
 
 	ack1 := message.NewPubackMessage()
 	ack1.SetPacketId(1)
 	sess.Pub1ack.Ack(ack1)
 
 	acked := sess.Pub1ack.Acked()
-	assert.Equal(t, true, 0, len(acked))
+	require.Equal(t, 0, len(acked))
 
 	ack0 := message.NewPubackMessage()
 	ack0.SetPacketId(0)
 	sess.Pub1ack.Ack(ack0)
 
 	acked = sess.Pub1ack.Acked()
-	assert.Equal(t, true, 2, len(acked))
+	require.Equal(t, 2, len(acked))
 }
 
 func newConnectMessage() *message.ConnectMessage {

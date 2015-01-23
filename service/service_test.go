@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dataence/assert"
-	"github.com/dataence/glog"
+	"github.com/stretchr/testify/require"
 	"github.com/surge/surgemq/message"
 	"github.com/surge/surgemq/topics"
+	"github.com/surgebase/glog"
 )
 
 var authenticator string = "mockSuccess"
@@ -51,7 +51,7 @@ func TestServiceWillDelivery(t *testing.T) {
 
 	uri := "tcp://127.0.0.1:1883"
 	u, err := url.Parse(uri)
-	assert.NoError(t, true, err, "Error parsing URL")
+	require.NoError(t, err, "Error parsing URL")
 
 	// Start listener
 	wg.Add(1)
@@ -60,15 +60,15 @@ func TestServiceWillDelivery(t *testing.T) {
 	<-ready1
 
 	c1 := connectToServer(t, uri)
-	assert.NotNil(t, true, c1)
+	require.NotNil(t, c1)
 	defer topics.Unregister(c1.svc.sess.ID())
 
 	c2 := connectToServer(t, uri)
-	assert.NotNil(t, true, c2)
+	require.NotNil(t, c2)
 	defer topics.Unregister(c2.svc.sess.ID())
 
 	c3 := connectToServer(t, uri)
-	assert.NotNil(t, true, c3)
+	require.NotNil(t, c3)
 	defer topics.Unregister(c3.svc.sess.ID())
 
 	sub := message.NewSubscribeMessage()
@@ -87,8 +87,8 @@ func TestServiceWillDelivery(t *testing.T) {
 			return nil
 		},
 		func(msg *message.PublishMessage) error {
-			assert.Equal(t, true, message.QosAtLeastOnce, msg.QoS())
-			assert.Equal(t, true, []byte("send me home"), msg.Payload())
+			require.Equal(t, message.QosAtLeastOnce, msg.QoS())
+			require.Equal(t, []byte("send me home"), msg.Payload())
 
 			will := atomic.AddInt64(&willdone, 1)
 			if will == int64(subscribers-1) {
@@ -108,8 +108,8 @@ func TestServiceWillDelivery(t *testing.T) {
 			return nil
 		},
 		func(msg *message.PublishMessage) error {
-			assert.Equal(t, true, message.QosAtLeastOnce, msg.QoS())
-			assert.Equal(t, true, []byte("send me home"), msg.Payload())
+			require.Equal(t, message.QosAtLeastOnce, msg.QoS())
+			require.Equal(t, []byte("send me home"), msg.Payload())
 
 			will := atomic.AddInt64(&willdone, 1)
 			if will == int64(subscribers-1) {
@@ -123,7 +123,7 @@ func TestServiceWillDelivery(t *testing.T) {
 	case <-ready3:
 
 	case <-time.After(time.Millisecond * 100):
-		assert.Fail(t, true, "Test timed out")
+		require.FailNow(t, "Test timed out")
 	}
 
 	c2.Disconnect()
@@ -154,7 +154,7 @@ func TestServiceSubUnsub(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 	})
 }
@@ -169,7 +169,7 @@ func TestServiceSubRetain(t *testing.T) {
 
 		tmgr, _ := topics.NewManager("mem")
 		err := tmgr.Retain(rmsg)
-		assert.NoError(t, true, err)
+		require.NoError(t, err)
 
 		done := make(chan struct{})
 
@@ -184,15 +184,15 @@ func TestServiceSubRetain(t *testing.T) {
 
 			},
 			func(msg *message.PublishMessage) error {
-				assert.Equal(t, true, msg.Topic(), []byte("abc"))
-				assert.Equal(t, true, msg.Payload(), []byte("this is a test"))
+				require.Equal(t, msg.Topic(), []byte("abc"))
+				require.Equal(t, msg.Payload(), []byte("this is a test"))
 				return nil
 			})
 
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 	})
 }
@@ -228,7 +228,7 @@ func TestServiceSub0Pub0(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		msg := newPublishMessage(0, 0)
@@ -239,10 +239,10 @@ func TestServiceSub0Pub0(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, count)
+			require.Equal(t, 10, count)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for publish messages")
+			require.FailNow(t, "Timed out waiting for publish messages")
 		}
 
 	})
@@ -279,7 +279,7 @@ func TestServiceSub1Pub0(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		msg := newPublishMessage(0, 0)
@@ -290,10 +290,10 @@ func TestServiceSub1Pub0(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, count)
+			require.Equal(t, 10, count)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for publish messages")
+			require.FailNow(t, "Timed out waiting for publish messages")
 		}
 
 	})
@@ -315,14 +315,14 @@ func TestServiceSub0Pub1(t *testing.T) {
 				return nil
 			},
 			func(msg *message.PublishMessage) error {
-				assert.Fail(t, true, "Should not have received any publish message")
+				require.FailNow(t, "Should not have received any publish message")
 				return nil
 			})
 
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		for i := uint16(1); i <= 10; i++ {
@@ -332,15 +332,15 @@ func TestServiceSub0Pub1(t *testing.T) {
 				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
-					assert.NoError(t, true, err)
+					require.NoError(t, err)
 
 					pub, ok := msg.(*message.PublishMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
 					puback, ok := ack.(*message.PubackMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
-					assert.Equal(t, true, pub.PacketId(), puback.PacketId())
+					require.Equal(t, pub.PacketId(), puback.PacketId())
 
 					if pub.PacketId() == 10 {
 						close(done2)
@@ -352,10 +352,10 @@ func TestServiceSub0Pub1(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, ackcnt)
+			require.Equal(t, 10, ackcnt)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for puback messages")
+			require.FailNow(t, "Timed out waiting for puback messages")
 		}
 
 		select {
@@ -396,7 +396,7 @@ func TestServiceSub1Pub1(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		for i := uint16(1); i <= 10; i++ {
@@ -406,15 +406,15 @@ func TestServiceSub1Pub1(t *testing.T) {
 				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
-					assert.NoError(t, true, err)
+					require.NoError(t, err)
 
 					pub, ok := msg.(*message.PublishMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
 					puback, ok := ack.(*message.PubackMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
-					assert.Equal(t, true, pub.PacketId(), puback.PacketId())
+					require.Equal(t, pub.PacketId(), puback.PacketId())
 
 					if pub.PacketId() == 10 {
 						close(done3)
@@ -426,18 +426,18 @@ func TestServiceSub1Pub1(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, count)
+			require.Equal(t, 10, count)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for publish messages")
+			require.FailNow(t, "Timed out waiting for publish messages")
 		}
 
 		select {
 		case <-done3:
-			assert.Equal(t, true, 10, ackcnt)
+			require.Equal(t, 10, ackcnt)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for puback messages")
+			require.FailNow(t, "Timed out waiting for puback messages")
 		}
 	})
 }
@@ -474,7 +474,7 @@ func TestServiceSub2Pub1(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		for i := uint16(1); i <= 10; i++ {
@@ -484,15 +484,15 @@ func TestServiceSub2Pub1(t *testing.T) {
 				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
-					assert.NoError(t, true, err)
+					require.NoError(t, err)
 
 					pub, ok := msg.(*message.PublishMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
 					puback, ok := ack.(*message.PubackMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
-					assert.Equal(t, true, pub.PacketId(), puback.PacketId())
+					require.Equal(t, pub.PacketId(), puback.PacketId())
 
 					if pub.PacketId() == 10 {
 						close(done3)
@@ -504,18 +504,18 @@ func TestServiceSub2Pub1(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, count)
+			require.Equal(t, 10, count)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for publish messages")
+			require.FailNow(t, "Timed out waiting for publish messages")
 		}
 
 		select {
 		case <-done3:
-			assert.Equal(t, true, 10, ackcnt)
+			require.Equal(t, 10, ackcnt)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for puback messages")
+			require.FailNow(t, "Timed out waiting for puback messages")
 		}
 	})
 }
@@ -536,14 +536,14 @@ func TestServiceSub1Pub2(t *testing.T) {
 				return nil
 			},
 			func(msg *message.PublishMessage) error {
-				assert.Fail(t, true, "Should not have received any publish message")
+				require.FailNow(t, "Should not have received any publish message")
 				return nil
 			})
 
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		for i := uint16(1); i <= 10; i++ {
@@ -553,15 +553,15 @@ func TestServiceSub1Pub2(t *testing.T) {
 				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
-					assert.NoError(t, true, err)
+					require.NoError(t, err)
 
 					pub, ok := msg.(*message.PublishMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
 					pubcomp, ok := ack.(*message.PubcompMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
-					assert.Equal(t, true, pub.PacketId(), pubcomp.PacketId())
+					require.Equal(t, pub.PacketId(), pubcomp.PacketId())
 
 					if pub.PacketId() == 10 {
 						close(done2)
@@ -573,10 +573,10 @@ func TestServiceSub1Pub2(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, ackcnt)
+			require.Equal(t, 10, ackcnt)
 
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for puback messages")
+			require.FailNow(t, "Timed out waiting for puback messages")
 		}
 
 		select {
@@ -617,7 +617,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(time.Millisecond * 100):
-			assert.Fail(t, true, "Timed out waiting for subscribe response")
+			require.FailNow(t, "Timed out waiting for subscribe response")
 		}
 
 		for i := uint16(1); i <= 10; i++ {
@@ -627,15 +627,15 @@ func TestServiceSub2Pub2(t *testing.T) {
 				func(msg, ack message.Message, err error) error {
 					ackcnt++
 
-					assert.NoError(t, true, err)
+					require.NoError(t, err)
 
 					pub, ok := msg.(*message.PublishMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
 					pubcomp, ok := ack.(*message.PubcompMessage)
-					assert.True(t, true, ok)
+					require.True(t, ok)
 
-					assert.Equal(t, true, pub.PacketId(), pubcomp.PacketId())
+					require.Equal(t, pub.PacketId(), pubcomp.PacketId())
 
 					if pub.PacketId() == 10 {
 						close(done3)
@@ -647,23 +647,23 @@ func TestServiceSub2Pub2(t *testing.T) {
 
 		select {
 		case <-done2:
-			assert.Equal(t, true, 10, count)
+			require.Equal(t, 10, count)
 
 		case <-time.After(time.Millisecond * 300):
-			assert.Fail(t, true, fmt.Sprintf("Timed out waiting for publish messages. Expecting %d, got %d.", 10, count))
+			require.FailNow(t, fmt.Sprintf("Timed out waiting for publish messages. Expecting %d, got %d.", 10, count))
 		}
 
 		select {
 		case <-done3:
-			assert.Equal(t, true, 10, ackcnt)
+			require.Equal(t, 10, ackcnt)
 
 		case <-time.After(time.Millisecond * 600):
-			assert.Fail(t, true, "Timed out waiting for puback messages")
+			require.FailNow(t, "Timed out waiting for puback messages")
 		}
 	})
 }
 
 func assertPublishMessage(t *testing.T, msg *message.PublishMessage, qos byte) {
-	assert.Equal(t, true, "abc", string(msg.Payload()))
-	assert.Equal(t, true, qos, msg.QoS())
+	require.Equal(t, "abc", string(msg.Payload()))
+	require.Equal(t, qos, msg.QoS())
 }
