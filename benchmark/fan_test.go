@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/surgebase/glog"
-	"github.com/surge/surgemq/message"
-	"github.com/surge/surgemq/service"
+	"github.com/surge/glog"
+	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/surgemq/service"
 )
 
 // Usage: go test -run=FullMesh

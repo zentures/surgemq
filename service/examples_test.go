@@ -14,7 +14,7 @@
 
 package service
 
-import "github.com/surge/surgemq/message"
+import "github.com/surgemq/surgemq/message"
 
 func ExampleServer() {
 	// Create a new server

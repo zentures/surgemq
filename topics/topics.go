@@ -26,7 +26,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/surge/surgemq/message"
+	"github.com/surgemq/surgemq/message"
 )
 
 const (
