@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"sync"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -33,6 +34,10 @@ var (
 	topic       []byte = []byte("test")
 	qos         byte   = 0
 	nap         int    = 10
+	host        string = "127.0.0.1"
+	port        int    = 1883
+	user        string = "surgemq"
+	pass        string = "surgemq"
 
 	subdone, rcvdone, sentdone int64
 
@@ -49,6 +54,10 @@ var (
 )
 
 func init() {
+	flag.StringVar(&host, "host", host, "host to server")
+	flag.IntVar(&port, "port", port, "port to server")
+	flag.StringVar(&user, "user", user, "pass to server")
+	flag.StringVar(&pass, "pass", pass, "user to server")
 	flag.IntVar(&messages, "messages", messages, "number of messages to send")
 	flag.IntVar(&publishers, "publishers", publishers, "number of publishers to start (in FullMesh, only this is used)")
 	flag.IntVar(&subscribers, "subscribers", subscribers, "number of subscribers to start (in FullMesh, this is NOT used")
@@ -63,7 +72,8 @@ func runClientTest(t testing.TB, cid int, wg *sync.WaitGroup, f func(*service.Cl
 		size = 10
 	}
 
-	uri := "tcp://127.0.0.1:1883"
+	uri := "tcp://" + host + ":" + strconv.Itoa(port)
+
 	c := connectToServer(t, uri, cid)
 	if c == nil {
 		return
@@ -113,8 +123,8 @@ func newConnectMessage(cid int) *message.ConnectMessage {
 	msg.SetKeepAlive(10)
 	msg.SetWillTopic([]byte("will"))
 	msg.SetWillMessage([]byte("send me home"))
-	msg.SetUsername([]byte("surgemq"))
-	msg.SetPassword([]byte("verysecret"))
+	msg.SetUsername([]byte(user))
+	msg.SetPassword([]byte(pass))
 
 	return msg
 }
