@@ -22,7 +22,7 @@ import (
 	"runtime/pprof"
 
 	"github.com/surge/surgemq/service"
-	"github.com/surgebase/glog"
+	"github.com/surge/glog"
 )
 
 var (
