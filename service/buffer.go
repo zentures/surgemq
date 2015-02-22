@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	bufcnt int32
+	bufcnt int64
 )
 
 const (
@@ -56,7 +56,7 @@ func (this *sequence) set(seq int64) {
 }
 
 type buffer struct {
-	id int32
+	id int64
 
 	buf []byte
 	tmp []byte
@@ -94,7 +94,7 @@ func newBuffer(size int64) (*buffer, error) {
 	}
 
 	return &buffer{
-		id:    atomic.AddInt32(&bufcnt, 1),
+		id:    atomic.AddInt64(&bufcnt, 1),
 		buf:   make([]byte, size),
 		size:  size,
 		mask:  size - 1,
@@ -107,7 +107,7 @@ func newBuffer(size int64) (*buffer, error) {
 	}, nil
 }
 
-func (this *buffer) ID() int32 {
+func (this *buffer) ID() int64 {
 	return this.id
 }
 
