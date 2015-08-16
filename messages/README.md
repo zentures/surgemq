@@ -1,4 +1,4 @@
-Package mqtt is an encoder/decoder library for MQTT 3.1 and 3.1.1 messages. You can
+Package message is an encoder/decoder library for MQTT 3.1 and 3.1.1 messages. You can
 find the MQTT specs at the following locations:
 
 >	3.1.1 - http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/
