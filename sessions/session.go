@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/message"
 )
 
 const (

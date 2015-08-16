@@ -69,9 +69,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/surge/surgemq/message"
-	"github.com/surge/surgemq/service"
-	"github.com/surgebase/netx"
+	"github.com/surge/netx"
+	"github.com/surgemq/message"
+	"github.com/surgemq/surgemq/service"
 )
 
 type strlist []string

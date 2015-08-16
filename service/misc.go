@@ -20,7 +20,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/message"
 )
 
 func getConnectMessage(conn io.Closer) (*message.ConnectMessage, error) {

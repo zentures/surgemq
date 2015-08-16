@@ -21,7 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/message"
 	"github.com/surgemq/surgemq/sessions"
 	"github.com/surgemq/surgemq/topics"
 )

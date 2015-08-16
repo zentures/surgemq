@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/surge/glog"
-	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/message"
 	"github.com/surgemq/surgemq/service"
 )
 

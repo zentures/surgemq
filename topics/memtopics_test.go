@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/message"
 )
 
 func TestNextTopicLevelSuccess(t *testing.T) {

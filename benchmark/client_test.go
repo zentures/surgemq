@@ -17,12 +17,12 @@ package benchmark
 import (
 	"flag"
 	"fmt"
-	"sync"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/surgemq/message"
+	"github.com/surgemq/message"
 	"github.com/surgemq/surgemq/service"
 )
 

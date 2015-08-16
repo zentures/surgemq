@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/surgemq/message"
-	"github.com/surgemq/surgemq/topics"
 	"github.com/surge/glog"
+	"github.com/surgemq/message"
+	"github.com/surgemq/surgemq/topics"
 )
 
 var authenticator string = "mockSuccess"
