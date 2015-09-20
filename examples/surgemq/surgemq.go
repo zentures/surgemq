@@ -19,7 +19,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"runtime"
 	"runtime/pprof"
 
 	"github.com/surge/glog"
@@ -100,16 +99,6 @@ func main() {
 
 	if len(wsAddr) > 0 || len(wssAddr) > 0 {
 		addr := "tcp://127.0.0.1:1883"
-		if runtime.GOOS != "windows" {
-			/* if unix, we create a unix domain socket listener */
-			addr = "unix://\x00surgemq\x00/"
-			go func() {
-				err = svr.ListenAndServe(addr)
-				if err != nil {
-					glog.Errorf("surgemq/main: %v", err)
-				}
-			}()
-		}
 		AddWebsocketHandler("/mqtt", addr)
 		/* start a plain websocket listener */
 		if len(wsAddr) > 0 {
