@@ -27,10 +27,10 @@ func TestBufferSequence(t *testing.T) {
 	seq := newSequence()
 
 	seq.set(100)
-	require.Equal(t, 100, seq.get())
+	require.Equal(t, int64(100), seq.get())
 
 	seq.set(20000)
-	require.Equal(t, 20000, seq.get())
+	require.Equal(t, int64(20000), seq.get())
 }
 
 func TestBufferReadFrom(t *testing.T) {
@@ -94,7 +94,7 @@ func testFillBuffer(t *testing.T, bufsize, ringsize int64) *buffer {
 
 	fillBuffer(t, buf, bufsize)
 
-	require.Equal(t, bufsize, buf.Len())
+	require.Equal(t, int(bufsize), buf.Len())
 
 	return buf
 }
@@ -154,7 +154,7 @@ func testWriteTo(t *testing.T, buf *buffer) {
 	m, err := buf.WriteTo(bytes.NewBuffer(make([]byte, n)))
 
 	require.Equal(t, io.EOF, err)
-	require.Equal(t, 20000, m)
+	require.Equal(t, int64(20000), m)
 }
 
 func testRead(t *testing.T, buf *buffer) {

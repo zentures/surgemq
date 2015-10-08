@@ -210,7 +210,7 @@ func newTestBuffer(t *testing.T, msgBytes []byte) *service {
 	l, err := svc.in.ReadFrom(buf)
 
 	require.Equal(t, io.EOF, err)
-	require.Equal(t, len(msgBytes), l)
+	require.Equal(t, int64(len(msgBytes)), l)
 
 	return svc
 }
