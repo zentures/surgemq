@@ -25,6 +25,23 @@ import (
 	"github.com/surgemq/message"
 )
 
+type netReader interface {
+	io.Reader
+	SetReadDeadline(t time.Time) error
+}
+
+type timeoutReader struct {
+	d    time.Duration
+	conn netReader
+}
+
+func (r timeoutReader) Read(b []byte) (int, error) {
+	if err := r.conn.SetReadDeadline(time.Now().Add(r.d)); err != nil {
+		return 0, err
+	}
+	return r.conn.Read(b)
+}
+
 // receiver() reads data from the network, and writes the data into the incoming buffer
 func (this *service) receiver() {
 	defer func() {
@@ -45,10 +62,13 @@ func (this *service) receiver() {
 	switch conn := this.conn.(type) {
 	case net.Conn:
 		//glog.Debugf("server/handleConnection: Setting read deadline to %d", time.Second*time.Duration(this.keepAlive))
-		conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.keepAlive)))
+		r := timeoutReader{
+			d:    time.Second * time.Duration(this.keepAlive),
+			conn: conn,
+		}
 
 		for {
-			_, err := this.in.ReadFrom(conn)
+			_, err := this.in.ReadFrom(r)
 
 			if err != nil {
 				if err != io.EOF {
