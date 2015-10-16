@@ -62,8 +62,9 @@ func (this *service) receiver() {
 	switch conn := this.conn.(type) {
 	case net.Conn:
 		//glog.Debugf("server/handleConnection: Setting read deadline to %d", time.Second*time.Duration(this.keepAlive))
+		keepAlive := time.Second * time.Duration(this.keepAlive)
 		r := timeoutReader{
-			d:    time.Second * time.Duration(this.keepAlive),
+			d:    keepAlive + (keepAlive / 2),
 			conn: conn,
 		}
 
