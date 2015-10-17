@@ -25,7 +25,7 @@ func TestMessageHeaderFields(t *testing.T) {
 
 	header.SetRemainingLength(33)
 
-	require.Equal(t, 33, header.RemainingLength())
+	require.Equal(t, int32(33), header.RemainingLength())
 
 	err := header.SetRemainingLength(268435456)
 
