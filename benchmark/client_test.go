@@ -38,6 +38,7 @@ var (
 	port        int    = 1883
 	user        string = "surgemq"
 	pass        string = "surgemq"
+	version     int    = 4
 
 	subdone, rcvdone, sentdone int64
 
@@ -62,6 +63,7 @@ func init() {
 	flag.IntVar(&publishers, "publishers", publishers, "number of publishers to start (in FullMesh, only this is used)")
 	flag.IntVar(&subscribers, "subscribers", subscribers, "number of subscribers to start (in FullMesh, this is NOT used")
 	flag.IntVar(&size, "size", size, "size of message payload to send, minimum 10 bytes")
+	flag.IntVar(&version, "version", version, "mqtt version (4 is 3.1.1)")
 	flag.Parse()
 }
 
@@ -117,7 +119,7 @@ func newPublishMessageLarge(qos byte) *message.PublishMessage {
 func newConnectMessage(cid int) *message.ConnectMessage {
 	msg := message.NewConnectMessage()
 	msg.SetWillQos(1)
-	msg.SetVersion(4)
+	msg.SetVersion(byte(version))
 	msg.SetCleanSession(true)
 	msg.SetClientId([]byte(fmt.Sprintf("surgemq%d", cid)))
 	msg.SetKeepAlive(10)
