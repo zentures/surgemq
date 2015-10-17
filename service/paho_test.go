@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var f MQTT.MessageHandler = func(client *MQTT.MqttClient, msg MQTT.Message) {
+var f MQTT.MessageHandler = func(client *MQTT.Client, msg MQTT.Message) {
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
@@ -49,47 +49,34 @@ func TestPahoGoClient(t *testing.T) {
 
 	<-ready1
 
-	opts := MQTT.NewClientOptions().AddBroker("tcp://localhost:1883").SetClientId("trivial")
+	opts := MQTT.NewClientOptions().AddBroker("tcp://localhost:1883").SetClientID("trivial")
 	opts.SetDefaultPublishHandler(f)
 
 	c := MQTT.NewClient(opts)
-	_, err = c.Start()
-	require.NoError(t, err)
+	token := c.Connect()
+	token.Wait()
+	require.NoError(t, token.Error())
 
-	filter, _ := MQTT.NewTopicFilter("/go-mqtt/sample", 0)
-	receipt, err := c.StartSubscription(nil, filter)
-	require.NoError(t, err)
-
-	select {
-	case <-receipt:
-
-	case <-time.After(time.Millisecond * 100):
-		require.FailNow(t, "Test timed out")
-	}
+	filters := map[string]byte{"/go-mqtt/sample": 0}
+	token = c.SubscribeMultiple(filters, nil)
+	token.WaitTimeout(time.Millisecond * 100)
+	token.Wait()
+	require.NoError(t, token.Error())
 
 	for i := 0; i < 100; i++ {
 		text := fmt.Sprintf("this is msg #%d!", i)
-		receipt := c.Publish(MQTT.QOS_ONE, "/go-mqtt/sample", []byte(text))
-
-		select {
-		case <-receipt:
-
-		case <-time.After(time.Millisecond * 100):
-			require.FailNow(t, "Test timed out")
-		}
+		token = c.Publish("/go-mqtt/sample", 1, false, []byte(text))
+		token.WaitTimeout(time.Millisecond * 100)
+		token.Wait()
+		require.NoError(t, token.Error())
 	}
 
 	time.Sleep(3 * time.Second)
 
-	receipt, err = c.EndSubscription("/go-mqtt/sample")
-	require.NoError(t, err)
-
-	select {
-	case <-receipt:
-
-	case <-time.After(time.Millisecond * 100):
-		require.FailNow(t, "Test timed out")
-	}
+	token = c.Unsubscribe("/go-mqtt/sample")
+	token.Wait()
+	token.WaitTimeout(time.Millisecond * 100)
+	require.NoError(t, token.Error())
 
 	c.Disconnect(250)
 
