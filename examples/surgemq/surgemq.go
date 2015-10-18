@@ -34,6 +34,10 @@ var (
 	sessionsProvider string
 	topicsProvider   string
 	cpuprofile       string
+	wsAddr           string // HTTPS websocket address eg. :8080
+	wssAddr          string // HTTPS websocket address, eg. :8081
+	wssCertPath      string // path to HTTPS public key
+	wssKeyPath       string // path to HTTPS private key
 )
 
 func init() {
@@ -45,6 +49,10 @@ func init() {
 	flag.StringVar(&sessionsProvider, "sessions", service.DefaultSessionsProvider, "Session Provider Type")
 	flag.StringVar(&topicsProvider, "topics", service.DefaultTopicsProvider, "Topics Provider Type")
 	flag.StringVar(&cpuprofile, "cpuprofile", "", "CPU Profile Filename")
+	flag.StringVar(&wsAddr, "wsaddr", "", "HTTP websocket address, eg. ':8080'")
+	flag.StringVar(&wssAddr, "wssaddr", "", "HTTPS websocket address, eg. ':8081'")
+	flag.StringVar(&wssCertPath, "wsscertpath", "", "HTTPS server public key file")
+	flag.StringVar(&wssKeyPath, "wsskeypath", "", "HTTPS server private key file")
 	flag.Parse()
 }
 
@@ -87,9 +95,24 @@ func main() {
 		os.Exit(0)
 	}()
 
-	err = svr.ListenAndServe("tcp://:1883")
+	mqttaddr := "tcp://:1883"
+
+	if len(wsAddr) > 0 || len(wssAddr) > 0 {
+		addr := "tcp://127.0.0.1:1883"
+		AddWebsocketHandler("/mqtt", addr)
+		/* start a plain websocket listener */
+		if len(wsAddr) > 0 {
+			go ListenAndServeWebsocket(wsAddr)
+		}
+		/* start a secure websocket listener */
+		if len(wssAddr) > 0 && len(wssCertPath) > 0 && len(wssKeyPath) > 0 {
+			go ListenAndServeWebsocketSecure(wssAddr, wssCertPath, wssKeyPath)
+		}
+	}
+
+	/* create plain MQTT listener */
+	err = svr.ListenAndServe(mqttaddr)
 	if err != nil {
 		glog.Errorf("surgemq/main: %v", err)
 	}
-
 }
