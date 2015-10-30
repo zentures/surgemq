@@ -228,7 +228,7 @@ func (this *service) stop() {
 		} else {
 			for _, t := range topics {
 				if err := this.topicsMgr.Unsubscribe([]byte(t), &this.onpub); err != nil {
-					glog.Errorf("(%d/%s): Error unsubscribing topic %q: %v", this.cid(), t, err)
+					glog.Errorf("(%s): Error unsubscribing topic %q: %v", this.cid(), t, err)
 				}
 			}
 		}
