@@ -79,9 +79,6 @@ func (this *service) receiver() {
 			}
 		}
 
-	//case *websocket.Conn:
-	//	glog.Errorf("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
-
 	default:
 		glog.Errorf("(%s) %v", this.cid(), ErrInvalidConnectionType)
 	}
@@ -116,9 +113,6 @@ func (this *service) sender() {
 				return
 			}
 		}
-
-	//case *websocket.Conn:
-	//	glog.Errorf("(%s) Websocket not supported", this.cid())
 
 	default:
 		glog.Errorf("(%s) Invalid connection type", this.cid())

@@ -21,6 +21,7 @@ Standalone SurgeMQ server, creates listeners for plaintext MQTT, Websocket and S
 - `-wssaddr string`: HTTPS websocket listener address, (eg. ":8443") (default none)
 - `-wsscertpath string`: HTTPS listener public key file, (eg. "certificate.pem") (default none)
 - `-wsskeypath string`: HTTPS listener private key file, (eg. "key.pem") (default none)
+- `-wsorigin value`: Allowed websocket Origin(s) (comma-separated), eg. 'http://localhost:8000,https://localhost:8081' (default none)
 
 ## Websocket listener
 
@@ -34,10 +35,14 @@ The following steps will setup the server to use a self-signed certificate.
 1. Generate a self-signed TLS certificate:
 `openssl genrsa -out key.pem 2048; openssl req -new -key key.pem -out csr.pem; openssl req -x509 -days 365 -key key.pem -in csr.pem -out certificate.pem`
 
-2. Start standalone server: `surgemq.exe -wssaddr :8443 -wsscertpath certificate.pem -wsskeypath key.pem`
+2. Start standalone server: `surgemq -wssaddr :8443 -wsscertpath certificate.pem -wsskeypath key.pem`
 
 3. For self-signed certificate, add a security exception to the browser (eg: http://www.poweradmin.com/help/sslhints/firefox.aspx)
 
 ## Testing
 
 Websocket support has been tested with the HiveMQ websocket client at http://www.hivemq.com/demos/websocket-client/
+
+To allow connections from the HiveMQ client, you must allow a websocket Origin of http://www.hivemq.com, ie:
+
+`surgemq -wsaddr :8080 -wsorigin http://www.hivemq.com`
