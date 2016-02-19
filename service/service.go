@@ -242,12 +242,12 @@ func (this *service) stop() {
 
 	// Remove the client topics manager
 	if this.client {
-		topics.Unregister(this.cid())
+		topics.Unregister(this.sess.ID())
 	}
 
 	// Remove the session from session store if it's suppose to be clean session
 	if this.sess.Cmsg.CleanSession() && this.sessMgr != nil {
-		this.sessMgr.Del(this.cid())
+		this.sessMgr.Del(this.sess.ID())
 	}
 
 	this.conn = nil
