@@ -235,7 +235,7 @@ func (this *service) stop() {
 	}
 
 	// Publish will message if WillFlag is set. Server side only.
-	if !this.client && this.sess.Cmsg.WillFlag() {
+	if !this.client && this.sess.WillFlag() {
 		glog.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will.", this.cid())
 		this.onPublish(this.sess.Will)
 	}
@@ -246,7 +246,7 @@ func (this *service) stop() {
 	}
 
 	// Remove the session from session store if it's suppose to be clean session
-	if this.sess.Cmsg.CleanSession() && this.sessMgr != nil {
+	if this.sess.CleanSession() && this.sessMgr != nil {
 		this.sessMgr.Del(this.sess.ID())
 	}
 
