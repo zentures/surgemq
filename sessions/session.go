@@ -46,7 +46,7 @@ type Session struct {
 	Pingack *Ackqueue
 
 	// cmsg is the CONNECT message
-	Cmsg *message.ConnectMessage
+	cmsg *message.ConnectMessage
 
 	// Will message to publish if connect is closed unexpectedly
 	Will *message.PublishMessage
@@ -200,4 +200,21 @@ func (this *Session) Topics() ([]string, []byte, error) {
 
 func (this *Session) ID() string {
 	return string(this.Cmsg.ClientId())
+}
+func (this *Session) WillFlag() bool {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+	return this.cmsg.WillFlag()
+}
+
+func (this *Session) SetWillFlag(v bool) {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+	this.cmsg.SetWillFlag(v)
+}
+
+func (this *Session) CleanSession() bool {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+	return this.cmsg.CleanSession()
 }
