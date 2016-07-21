@@ -128,6 +128,12 @@ func (this *Ackqueue) Wait(msg message.Message, onComplete interface{}) error {
 			State:      message.RESERVED,
 			OnComplete: onComplete,
 		}
+		ml := msg.Len()
+		this.ping.Msgbuf = make([]byte, ml)
+		_, err := msg.Encode(this.ping.Msgbuf)
+		if err != nil {
+			return err
+		}
 
 	default:
 		return errWaitMessage
@@ -165,6 +171,12 @@ func (this *Ackqueue) Ack(msg message.Message) error {
 	case message.PINGRESP:
 		if this.ping.Mtype == message.PINGREQ {
 			this.ping.State = message.PINGRESP
+			ml := msg.Len()
+			this.ping.Ackbuf = make([]byte, ml)
+			_, err := msg.Encode(this.ping.Ackbuf)
+			if err != nil {
+				return err
+			}
 		}
 
 	default:
