@@ -20,6 +20,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"net"
 )
 
 var (
@@ -162,6 +163,12 @@ func (this *buffer) ReadFrom(r io.Reader) (int64, error) {
 			}
 		}
 
+		if opError, ok := err.(*net.OpError); ok {
+			if opError.Err.Error() == "use of closed network connection" {
+				return total, io.EOF
+			}
+		}
+		
 		if err != nil {
 			return total, err
 		}
