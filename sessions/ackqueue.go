@@ -164,7 +164,13 @@ func (this *Ackqueue) Ack(msg message.Message) error {
 
 	case message.PINGRESP:
 		if this.ping.Mtype == message.PINGREQ {
+			this.ping.Mtype = message.PINGRESP
 			this.ping.State = message.PINGRESP
+			this.ping.Msgbuf = make([]byte, msg.Len())
+			_, err := msg.Encode(this.ping.Msgbuf)
+			if err != nil {
+				return err
+			}
 		}
 
 	default:
