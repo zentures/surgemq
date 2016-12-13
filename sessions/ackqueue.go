@@ -171,6 +171,7 @@ func (this *Ackqueue) Ack(msg message.Message) error {
 			if err != nil {
 				return err
 			}
+			this.ping.Ackbuf = this.ping.Msgbuf
 		}
 
 	default:
