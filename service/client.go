@@ -17,10 +17,12 @@ package service
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/surgemq/message"
 	"github.com/surgemq/surgemq/sessions"
 	"github.com/surgemq/surgemq/topics"
@@ -49,6 +51,15 @@ type Client struct {
 	// If no set then default to 3 retries.
 	TimeoutRetries int
 
+	// WebsocketDialer is the websocket.Dialer used to initiate a connection
+	// when using the websocket transport. If you wish to override this, you
+	// should use the NewWebsocketDialer() function to obtain sensible defaults.
+	WebsocketDialer *websocket.Dialer
+
+	// WebsocketOrigin defines the Origin header used to initiate a connection
+	// when using the websocket transport.
+	WebsocketOrigin string
+
 	svc *service
 }
 
@@ -57,6 +68,8 @@ type Client struct {
 // needs to be supplied with the MQTT CONNECT message.
 func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error) {
 	this.checkConfiguration()
+
+	var conn net.Conn
 
 	if msg == nil {
 		return fmt.Errorf("msg is nil")
@@ -67,11 +80,14 @@ func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error)
 		return err
 	}
 
-	if u.Scheme != "tcp" {
+	switch u.Scheme {
+	case `tcp`:
+		conn, err = net.Dial(u.Scheme, u.Host)
+	case `ws`, `wss`:
+		conn, err = this.websocketDial(u)
+	default:
 		return ErrInvalidConnectionType
 	}
-
-	conn, err := net.Dial(u.Scheme, u.Host)
 	if err != nil {
 		return err
 	}
@@ -202,5 +218,43 @@ func (this *Client) checkConfiguration() {
 
 	if this.TimeoutRetries == 0 {
 		this.TimeoutRetries = DefaultTimeoutRetries
+	}
+
+	if this.WebsocketDialer == nil {
+		this.WebsocketDialer = NewWebsocketDialer()
+		this.WebsocketDialer.HandshakeTimeout = time.Duration(this.ConnectTimeout) * time.Second
+	}
+}
+
+func (this *Client) websocketDial(u *url.URL) (net.Conn, error) {
+	var origin string
+
+	if this.WebsocketOrigin != `` {
+		origin = this.WebsocketOrigin
+	} else {
+		switch u.Scheme {
+		case `ws`:
+			origin = fmt.Sprintf("http://%s", u.Host)
+		case `wss`:
+			origin = fmt.Sprintf("https://%s", u.Host)
+		default:
+			return nil, fmt.Errorf("Invalid websocket scheme: %s", u.Scheme)
+		}
+	}
+	c, _, err := this.WebsocketDialer.Dial(u.String(), http.Header{
+		`Origin`: []string{origin},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return newWebsocketConn(c), nil
+}
+
+func NewWebsocketDialer() *websocket.Dialer {
+	return &websocket.Dialer{
+		HandshakeTimeout: DefaultConnectTimeout * time.Second,
+		ReadBufferSize:   defaultBufferSize,
+		WriteBufferSize:  defaultBufferSize,
+		Subprotocols:     []string{`mqtt`, `mqttv3.1`},
 	}
 }

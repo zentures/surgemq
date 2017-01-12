@@ -16,14 +16,19 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/pprof"
+	"strings"
 
 	"github.com/surge/glog"
 	"github.com/surgemq/surgemq/service"
 )
+
+type stringSlice []string
 
 var (
 	keepAlive        int
@@ -34,11 +39,26 @@ var (
 	sessionsProvider string
 	topicsProvider   string
 	cpuprofile       string
-	wsAddr           string // HTTPS websocket address eg. :8080
-	wssAddr          string // HTTPS websocket address, eg. :8081
-	wssCertPath      string // path to HTTPS public key
-	wssKeyPath       string // path to HTTPS private key
+	wsAddr           string      // HTTPS websocket address eg. :8080
+	wssAddr          string      // HTTPS websocket address, eg. :8081
+	wssCertPath      string      // path to HTTPS public key
+	wssKeyPath       string      // path to HTTPS private key
+	wsOrigin         stringSlice // Allowed Origin(s)
 )
+
+// String returns a string representation
+func (s *stringSlice) String() string {
+	return fmt.Sprint(*s)
+}
+
+// Set appends to the slice from a comma-separated string value
+func (s *stringSlice) Set(value string) error {
+	for _, val := range strings.Split(value, `,`) {
+		*s = append(*s, val)
+	}
+
+	return nil
+}
 
 func init() {
 	flag.IntVar(&keepAlive, "keepalive", service.DefaultKeepAlive, "Keepalive (sec)")
@@ -53,6 +73,7 @@ func init() {
 	flag.StringVar(&wssAddr, "wssaddr", "", "HTTPS websocket address, eg. ':8081'")
 	flag.StringVar(&wssCertPath, "wsscertpath", "", "HTTPS server public key file")
 	flag.StringVar(&wssKeyPath, "wsskeypath", "", "HTTPS server private key file")
+	flag.Var(&wsOrigin, "wsorigin", "Allowed websocket Origin(s) (comma-separated), eg. 'http://localhost:8000,https://localhost:8081'")
 	flag.Parse()
 }
 
@@ -98,15 +119,26 @@ func main() {
 	mqttaddr := "tcp://:1883"
 
 	if len(wsAddr) > 0 || len(wssAddr) > 0 {
-		addr := "tcp://127.0.0.1:1883"
-		AddWebsocketHandler("/mqtt", addr)
+		if len(wsOrigin) > 0 {
+			svr.WebsocketUpgrader = service.NewWebsocketUpgrader()
+			svr.WebsocketUpgrader.CheckOrigin = wsOriginFunc
+		}
+		http.HandleFunc(`/mqtt`, svr.WebsocketHandler)
 		/* start a plain websocket listener */
 		if len(wsAddr) > 0 {
-			go ListenAndServeWebsocket(wsAddr)
+			go func() {
+				if err = http.ListenAndServe(wsAddr, nil); err != nil {
+					panic(err)
+				}
+			}()
 		}
 		/* start a secure websocket listener */
 		if len(wssAddr) > 0 && len(wssCertPath) > 0 && len(wssKeyPath) > 0 {
-			go ListenAndServeWebsocketSecure(wssAddr, wssCertPath, wssKeyPath)
+			go func() {
+				if err = http.ListenAndServeTLS(wssAddr, wssCertPath, wssKeyPath, nil); err != nil {
+					panic(err)
+				}
+			}()
 		}
 	}
 
@@ -115,4 +147,13 @@ func main() {
 	if err != nil {
 		glog.Errorf("surgemq/main: %v", err)
 	}
+}
+
+func wsOriginFunc(r *http.Request) bool {
+	for _, origin := range wsOrigin {
+		if r.Header.Get(`Origin`) == origin {
+			return true
+		}
+	}
+	return false
 }

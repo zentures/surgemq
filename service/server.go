@@ -19,11 +19,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/surge/glog"
 	"github.com/surgemq/message"
 	"github.com/surgemq/surgemq/auth"
@@ -79,6 +81,11 @@ type Server struct {
 	// TopicsProvider is the topic store that keeps all the subscription topics.
 	// If not set then default to "mem".
 	TopicsProvider string
+
+	// WebsocketUpgrader is the weboscket.Upgrader used to upgrade connections
+	// in the websocket handler.  If you wish to override this, you should use
+	// the NewWebsocketUpgrader() function to obtain sensible defaults
+	WebsocketUpgrader *websocket.Upgrader
 
 	// authMgr is the authentication manager that we are going to use for authenticating
 	// incoming connections
@@ -212,6 +219,24 @@ func (this *Server) Publish(msg *message.PublishMessage, onComplete OnCompleteFu
 	return nil
 }
 
+// WebsocketHandler provides a http.HandlerFunc for processing MQTT over
+// websockets
+func (this *Server) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
+	if err := this.checkConfiguration(); err != nil {
+		glog.Errorf("Could not validate configuration: %+v", err)
+		return
+	}
+	conn, err := this.WebsocketUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		glog.Errorf("Could not upgrade websocket: %+v", err)
+		return
+	}
+	if _, err = this.handleConnection(newWebsocketConn(conn)); err != nil {
+		glog.Errorf("Error on websocket connection: %+v", err)
+		return
+	}
+}
+
 // Close terminates the server by shutting down all the client connections and closing
 // the listener. It will, as best it can, clean up after itself.
 func (this *Server) Close() error {
@@ -239,7 +264,7 @@ func (this *Server) Close() error {
 	return nil
 }
 
-// HandleConnection is for the broker to handle an incoming connection from a client
+// handleConnection is for the broker to handle an incoming connection from a client
 func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	if c == nil {
 		return nil, ErrInvalidConnectionType
@@ -385,6 +410,11 @@ func (this *Server) checkConfiguration() error {
 			this.TopicsProvider = "mem"
 		}
 
+		if this.WebsocketUpgrader == nil {
+			this.WebsocketUpgrader = NewWebsocketUpgrader()
+			this.WebsocketUpgrader.HandshakeTimeout = time.Duration(this.ConnectTimeout) * time.Second
+		}
+
 		this.topicsMgr, err = topics.NewManager(this.TopicsProvider)
 
 		return
@@ -441,4 +471,16 @@ func (this *Server) getSession(svc *service, req *message.ConnectMessage, resp *
 	}
 
 	return nil
+}
+
+// NewWebsocketUpgrader returns an instance of websocket.Upgrader with defaults
+// sensible for use with surgemq. See the documentation for
+// github.com/gorilla/websocket for further details.
+func NewWebsocketUpgrader() *websocket.Upgrader {
+	return &websocket.Upgrader{
+		HandshakeTimeout: DefaultConnectTimeout * time.Second,
+		ReadBufferSize:   defaultBufferSize,
+		WriteBufferSize:  defaultBufferSize,
+		Subprotocols:     []string{`mqtt`, `mqttv3.1`},
+	}
 }
