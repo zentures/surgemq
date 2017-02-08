@@ -48,6 +48,10 @@ const (
 	DefaultTopicsProvider   = "mem"
 )
 
+type (
+	MessageFilterFunc func(cmsg *message.ConnectMessage, msg message.Message) error
+)
+
 // Server is a library implementation of the MQTT server that, as best it can, complies
 // with the MQTT 3.1 and 3.1.1 specs.
 type Server struct {
@@ -109,8 +113,9 @@ type Server struct {
 	// A indicator on whether this server has already checked configuration
 	configOnce sync.Once
 
-	subs []interface{}
-	qoss []byte
+	subs          []interface{}
+	qoss          []byte
+	MessageFilter MessageFilterFunc
 }
 
 // ListenAndServe listents to connections on the URI requested, and handles any
@@ -310,9 +315,10 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		ackTimeout:     this.AckTimeout,
 		timeoutRetries: this.TimeoutRetries,
 
-		conn:      conn,
-		sessMgr:   this.sessMgr,
-		topicsMgr: this.topicsMgr,
+		conn:          conn,
+		sessMgr:       this.sessMgr,
+		topicsMgr:     this.topicsMgr,
+		messageFilter: this.MessageFilter,
 	}
 
 	err = this.getSession(svc, req, resp)
