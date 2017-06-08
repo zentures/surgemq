@@ -130,7 +130,7 @@ svr.ListenAndServe("tcp://:1883")
 
 ```
 // Instantiates a new Client
-c := &Client{}
+c := &service.Client{}
 
 // Creates a new MQTT CONNECT message and sets the proper parameters
 msg := message.NewConnectMessage()
