@@ -1,0 +1,29 @@
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.go]
+indent_style = tab
+
+[*.py]
+indent_style = spaces
+indent_size = 4
+
+[*.{css,js,json,jsx,proto,sh,tf,ts,tsx,yaml,yml}]
+indent_style = spaces
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[VERSION]
+insert_final_newline = false
