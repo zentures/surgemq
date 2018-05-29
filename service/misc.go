@@ -20,45 +20,45 @@ import (
 	"io"
 	"net"
 
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
-func getConnectMessage(conn io.Closer) (*message.ConnectMessage, error) {
+func getConnectMessage(conn io.Closer) (*messages.ConnectMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
-		//glog.Debugf("Receive error: %v", err)
+		//commons.Log.Debug("Receive error: %v", err)
 		return nil, err
 	}
 
-	msg := message.NewConnectMessage()
+	msg := messages.NewConnectMessage()
 
 	_, err = msg.Decode(buf)
-	//glog.Debugf("Received: %s", msg)
+	//commons.Log.Debug("Received: %s", msg)
 	return msg, err
 }
 
-func getConnackMessage(conn io.Closer) (*message.ConnackMessage, error) {
+func getConnackMessage(conn io.Closer) (*messages.ConnackMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
-		//glog.Debugf("Receive error: %v", err)
+		//commons.Log.Debug("Receive error: %v", err)
 		return nil, err
 	}
 
-	msg := message.NewConnackMessage()
+	msg := messages.NewConnackMessage()
 
 	_, err = msg.Decode(buf)
-	//glog.Debugf("Received: %s", msg)
+	//commons.Log.Debug("Received: %s", msg)
 	return msg, err
 }
 
-func writeMessage(conn io.Closer, msg message.Message) error {
+func writeMessage(conn io.Closer, msg messages.Message) error {
 	buf := make([]byte, msg.Len())
 	_, err := msg.Encode(buf)
 	if err != nil {
-		//glog.Debugf("Write error: %v", err)
+		//commons.Log.Debug("Write error: %v", err)
 		return err
 	}
-	//glog.Debugf("Writing: %s", msg)
+	//commons.Log.Debug("Writing: %s", msg)
 
 	return writeMessageBuffer(conn, buf)
 }
@@ -93,7 +93,7 @@ func getMessageBuffer(c io.Closer) ([]byte, error) {
 
 		n, err := conn.Read(b[0:])
 		if err != nil {
-			//glog.Debugf("Read error: %v", err)
+			//commons.Log.Debug("Read error: %v", err)
 			return nil, err
 		}
 

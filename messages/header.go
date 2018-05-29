@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"encoding/binary"
@@ -45,7 +45,7 @@ type header struct {
 	dirty bool
 }
 
-// String returns a string representation of the message.
+// String returns a string representation of the messages.
 func (this header) String() string {
 	return fmt.Sprintf("Type=%q, Flags=%08b, Remaining Length=%d", this.Type().Name(), this.Flags(), this.remlen)
 }
@@ -77,7 +77,7 @@ func (this *header) Type() MessageType {
 	return MessageType(this.mtypeflags[0] >> 4)
 }
 
-// SetType sets the message type of this message. It also correctly sets the
+// SetType sets the message type of this messages. It also correctly sets the
 // default flags for the message type. It returns an error if the type is invalid.
 func (this *header) SetType(mtype MessageType) error {
 	if !mtype.Valid() {
@@ -98,18 +98,18 @@ func (this *header) SetType(mtype MessageType) error {
 	return nil
 }
 
-// Flags returns the fixed header flags for this message.
+// Flags returns the fixed header flags for this messages.
 func (this *header) Flags() byte {
 	//return this.flags
 	return this.mtypeflags[0] & 0x0f
 }
 
-// RemainingLength returns the length of the non-fixed-header part of the message.
+// RemainingLength returns the length of the non-fixed-header part of the messages.
 func (this *header) RemainingLength() int32 {
 	return this.remlen
 }
 
-// SetRemainingLength sets the length of the non-fixed-header part of the message.
+// SetRemainingLength sets the length of the non-fixed-header part of the messages.
 // It returns error if the length is greater than 268435455, which is the max
 // message length as defined by the MQTT spec.
 func (this *header) SetRemainingLength(remlen int32) error {
@@ -210,7 +210,7 @@ func (this *header) decode(src []byte) (int, error) {
 	}
 
 	if this.Type() == PUBLISH && !ValidQos((this.Flags()>>1)&0x3) {
-		return total, fmt.Errorf("header/Decode: Invalid QoS (%d) for PUBLISH message.", (this.Flags()>>1)&0x3)
+		return total, fmt.Errorf("header/Decode: Invalid QoS (%d) for PUBLISH messages.", (this.Flags()>>1)&0x3)
 	}
 
 	total++

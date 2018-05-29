@@ -19,12 +19,12 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 var (
 	// MaxQosAllowed is the maximum QOS supported by this server
-	MaxQosAllowed = message.QosExactlyOnce
+	MaxQosAllowed = messages.QosExactlyOnce
 )
 
 var _ TopicsProvider = (*memTopics)(nil)
@@ -59,12 +59,12 @@ func NewMemProvider() *memTopics {
 }
 
 func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte, error) {
-	if !message.ValidQos(qos) {
-		return message.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
+	if !messages.ValidQos(qos) {
+		return messages.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
 	}
 
 	if sub == nil {
-		return message.QosFailure, fmt.Errorf("Subscriber cannot be nil")
+		return messages.QosFailure, fmt.Errorf("Subscriber cannot be nil")
 	}
 
 	this.smu.Lock()
@@ -75,7 +75,7 @@ func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte,
 	}
 
 	if err := this.sroot.sinsert(topic, qos, sub); err != nil {
-		return message.QosFailure, err
+		return messages.QosFailure, err
 	}
 
 	return qos, nil
@@ -90,7 +90,7 @@ func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
 
 // Returned values will be invalidated by the next Subscribers call
 func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
-	if !message.ValidQos(qos) {
+	if !messages.ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
 
@@ -103,12 +103,12 @@ func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, 
 	return this.sroot.smatch(topic, qos, subs, qoss)
 }
 
-func (this *memTopics) Retain(msg *message.PublishMessage) error {
+func (this *memTopics) Retain(msg *messages.PublishMessage) error {
 	this.rmu.Lock()
 	defer this.rmu.Unlock()
 
 	// So apparently, at least according to the MQTT Conformance/Interoperability
-	// Testing, that a payload of 0 means delete the retain message.
+	// Testing, that a payload of 0 means delete the retain messages.
 	// https://eclipse.org/paho/clients/testing/
 	if len(msg.Payload()) == 0 {
 		return this.rroot.rremove(msg.Topic())
@@ -117,7 +117,7 @@ func (this *memTopics) Retain(msg *message.PublishMessage) error {
 	return this.rroot.rinsert(msg.Topic(), msg)
 }
 
-func (this *memTopics) Retained(topic []byte, msgs *[]*message.PublishMessage) error {
+func (this *memTopics) Retained(topic []byte, msgs *[]*messages.PublishMessage) error {
 	this.rmu.RLock()
 	defer this.rmu.RUnlock()
 
@@ -282,7 +282,7 @@ func (this *snode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]b
 // retained message nodes
 type rnode struct {
 	// If this is the end of the topic string, then add retained messages here
-	msg *message.PublishMessage
+	msg *messages.PublishMessage
 	buf []byte
 
 	// Otherwise add the next topic level here
@@ -295,7 +295,7 @@ func newRNode() *rnode {
 	}
 }
 
-func (this *rnode) rinsert(topic []byte, msg *message.PublishMessage) error {
+func (this *rnode) rinsert(topic []byte, msg *messages.PublishMessage) error {
 	// If there's no more topic levels, that means we are at the matching rnode.
 	if len(topic) == 0 {
 		l := msg.Len()
@@ -313,7 +313,7 @@ func (this *rnode) rinsert(topic []byte, msg *message.PublishMessage) error {
 
 		// Reuse the message if possible
 		if this.msg == nil {
-			this.msg = message.NewPublishMessage()
+			this.msg = messages.NewPublishMessage()
 		}
 
 		if _, err := this.msg.Decode(this.buf); err != nil {
@@ -347,7 +347,7 @@ func (this *rnode) rinsert(topic []byte, msg *message.PublishMessage) error {
 // Remove the retained message for the supplied topic
 func (this *rnode) rremove(topic []byte) error {
 	// If the topic is empty, it means we are at the final matching rnode. If so,
-	// let's remove the buffer and message.
+	// let's remove the buffer and messages.
 	if len(topic) == 0 {
 		this.buf = nil
 		this.msg = nil
@@ -387,7 +387,7 @@ func (this *rnode) rremove(topic []byte) error {
 // rmatch() finds the retained messages for the topic and qos provided. It's somewhat
 // of a reverse match compare to match() since the supplied topic can contain
 // wildcards, whereas the retained message topic is a full (no wildcard) topic.
-func (this *rnode) rmatch(topic []byte, msgs *[]*message.PublishMessage) error {
+func (this *rnode) rmatch(topic []byte, msgs *[]*messages.PublishMessage) error {
 	// If the topic is empty, it means we are at the final matching rnode. If so,
 	// add the retained msg to the list.
 	if len(topic) == 0 {
@@ -427,7 +427,7 @@ func (this *rnode) rmatch(topic []byte, msgs *[]*message.PublishMessage) error {
 	return nil
 }
 
-func (this *rnode) allRetained(msgs *[]*message.PublishMessage) {
+func (this *rnode) allRetained(msgs *[]*messages.PublishMessage) {
 	if this.msg != nil {
 		*msgs = append(*msgs, this.msg)
 	}
@@ -506,7 +506,7 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 // It's also possible that even if the topic matches, the subscriber is not included
 // due to the QoS granted is lower than the published message QoS. For example,
 // if the client is granted only QoS 0, and the publish message is QoS 1, then this
-// client is not to be send the published message.
+// client is not to be send the published messages.
 func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
 	for i, sub := range this.subs {
 		// If the published QoS is higher than the subscriber QoS, then we skip the

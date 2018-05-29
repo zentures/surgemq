@@ -24,11 +24,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/surge/glog"
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/auth"
-	"github.com/surgemq/surgemq/sessions"
-	"github.com/surgemq/surgemq/topics"
+	""
+	"code.surgemq.com/messages"
+	"code.surgemq.com/auth"
+	"code.surgemq.com/sessions"
+	"code.surgemq.com/topics"
 )
 
 var (
@@ -68,11 +68,11 @@ type Server struct {
 	TimeoutRetries int
 
 	// Authenticator is the authenticator used to check username and password sent
-	// in the CONNECT message. If not set then default to "mockSuccess".
+	// in the CONNECT messages. If not set then default to "mockSuccess".
 	Authenticator string
 
 	// SessionsProvider is the session store that keeps all the Session objects.
-	// This is the store to check if CleanSession is set to 0 in the CONNECT message.
+	// This is the store to check if CleanSession is set to 0 in the CONNECT messages.
 	// If not set then default to "mem".
 	SessionsProvider string
 
@@ -138,7 +138,7 @@ func (this *Server) ListenAndServe(uri string) error {
 	}
 	defer this.ln.Close()
 
-	glog.Infof("server/ListenAndServe: server is ready...")
+	commons.Log.Info("server/ListenAndServe: server is ready...")
 
 	var tempDelay time.Duration // how long to sleep on accept failure
 
@@ -164,7 +164,7 @@ func (this *Server) ListenAndServe(uri string) error {
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
-				glog.Errorf("server/ListenAndServe: Accept error: %v; retrying in %v", err, tempDelay)
+				commons.Log.Error("server/ListenAndServe: Accept error: %v; retrying in %v", err, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
@@ -180,14 +180,14 @@ func (this *Server) ListenAndServe(uri string) error {
 // immediately after the message is sent to the outgoing buffer. For QOS 1 messages,
 // onComplete is called when PUBACK is received. For QOS 2 messages, onComplete is
 // called after the PUBCOMP message is received.
-func (this *Server) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
+func (this *Server) Publish(msg *messages.PublishMessage, onComplete OnCompleteFunc) error {
 	if err := this.checkConfiguration(); err != nil {
 		return err
 	}
 
 	if msg.Retain() {
 		if err := this.topicsMgr.Retain(msg); err != nil {
-			glog.Errorf("Error retaining message: %v", err)
+			commons.Log.Error("Error retaining message: %v", err)
 		}
 	}
 
@@ -197,12 +197,12 @@ func (this *Server) Publish(msg *message.PublishMessage, onComplete OnCompleteFu
 
 	msg.SetRetain(false)
 
-	//glog.Debugf("(server) Publishing to topic %q and %d subscribers", string(msg.Topic()), len(this.subs))
+	//commons.Log.Debug("(server) Publishing to topic %q and %d subscribers", string(msg.Topic()), len(this.subs))
 	for _, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
-				glog.Errorf("Invalid onPublish Function")
+				commons.Log.Error("Invalid onPublish Function")
 			} else {
 				(*fn)(msg)
 			}
@@ -224,7 +224,7 @@ func (this *Server) Close() error {
 	this.ln.Close()
 
 	for _, svc := range this.svcs {
-		glog.Infof("Stopping service %d", svc.id)
+		commons.Log.Info("Stopping service %d", svc.id)
 		svc.stop()
 	}
 
@@ -262,13 +262,13 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	}
 
 	// To establish a connection, we must
-	// 1. Read and decode the message.ConnectMessage from the wire
+	// 1. Read and decode the messages.ConnectMessage from the wire
 	// 2. If no decoding errors, then authenticate using username and password.
-	//    Otherwise, write out to the wire message.ConnackMessage with
+	//    Otherwise, write out to the wire messages.ConnackMessage with
 	//    appropriate error.
 	// 3. If authentication is successful, then either create a new session or
 	//    retrieve existing session
-	// 4. Write out to the wire a successful message.ConnackMessage message
+	// 4. Write out to the wire a successful messages.ConnackMessage message
 
 	// Read the CONNECT message from the wire, if error, then check to see if it's
 	// a CONNACK error. If it's CONNACK error, send the proper CONNACK error back
@@ -276,12 +276,12 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 
 	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.ConnectTimeout)))
 
-	resp := message.NewConnackMessage()
+	resp := messages.NewConnackMessage()
 
 	req, err := getConnectMessage(conn)
 	if err != nil {
-		if cerr, ok := err.(message.ConnackCode); ok {
-			//glog.Debugf("request   message: %s\nresponse message: %s\nerror           : %v", mreq, resp, err)
+		if cerr, ok := err.(messages.ConnackCode); ok {
+			//commons.Log.Debug("request   message: %s\nresponse message: %s\nerror           : %v", mreq, resp, err)
 			resp.SetReturnCode(cerr)
 			resp.SetSessionPresent(false)
 			writeMessage(conn, resp)
@@ -291,7 +291,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 
 	// Authenticate the user, if error, return error and exit
 	if err = this.authMgr.Authenticate(string(req.Username()), string(req.Password())); err != nil {
-		resp.SetReturnCode(message.ErrBadUsernameOrPassword)
+		resp.SetReturnCode(messages.ErrBadUsernameOrPassword)
 		resp.SetSessionPresent(false)
 		writeMessage(conn, resp)
 		return nil, err
@@ -320,7 +320,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		return nil, err
 	}
 
-	resp.SetReturnCode(message.ConnectionAccepted)
+	resp.SetReturnCode(messages.ConnectionAccepted)
 
 	if err = writeMessage(c, resp); err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	//this.svcs = append(this.svcs, svc)
 	//this.mu.Unlock()
 
-	glog.Infof("(%s) server/handleConnection: Connection established.", svc.cid())
+	commons.Log.Info("(%s) server/handleConnection: Connection established.", svc.cid())
 
 	return svc, nil
 }
@@ -393,7 +393,7 @@ func (this *Server) checkConfiguration() error {
 	return err
 }
 
-func (this *Server) getSession(svc *service, req *message.ConnectMessage, resp *message.ConnackMessage) error {
+func (this *Server) getSession(svc *service, req *messages.ConnectMessage, resp *messages.ConnackMessage) error {
 	// If CleanSession is set to 0, the server MUST resume communications with the
 	// client based on state from the current session, as identified by the client
 	// identifier. If there is no session associated with the client identifier the

@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/service"
+	"code.surgemq.com/messages"
+	"code.surgemq.com/service"
 )
 
 var (
@@ -99,16 +99,16 @@ func connectToServer(t testing.TB, uri string, cid int) *service.Client {
 	return c
 }
 
-func newSubscribeMessage(topic string, qos byte) *message.SubscribeMessage {
-	msg := message.NewSubscribeMessage()
+func newSubscribeMessage(topic string, qos byte) *messages.SubscribeMessage {
+	msg := messages.NewSubscribeMessage()
 	msg.SetPacketId(1)
 	msg.AddTopic([]byte(topic), qos)
 
 	return msg
 }
 
-func newPublishMessageLarge(qos byte) *message.PublishMessage {
-	msg := message.NewPublishMessage()
+func newPublishMessageLarge(qos byte) *messages.PublishMessage {
+	msg := messages.NewPublishMessage()
 	msg.SetTopic([]byte("test"))
 	msg.SetPayload(make([]byte, 1024))
 	msg.SetQoS(qos)
@@ -116,8 +116,8 @@ func newPublishMessageLarge(qos byte) *message.PublishMessage {
 	return msg
 }
 
-func newConnectMessage(cid int) *message.ConnectMessage {
-	msg := message.NewConnectMessage()
+func newConnectMessage(cid int) *messages.ConnectMessage {
+	msg := messages.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(byte(version))
 	msg.SetCleanSession(true)

@@ -1,9 +1,9 @@
 SurgeMQ
 =======
 
-[![GoDoc](http://godoc.org/github.com/surgemq/surgemq?status.svg)](http://godoc.org/github.com/surgemq/surgemq)
+[![GoDoc](http://godoc.org/code.surgemq.com?status.svg)](http://godoc.org/code.surgemq.com)
 
-SurgeMQ is a high performance MQTT broker and client library that aims to be fully compliant with MQTT 3.1 and 3.1.1 specs. The primary package that's of interest is package [service](http://godoc.org/github.com/surgemq/surgemq/service). It provides the MQTT Server and Client services in a library form.
+SurgeMQ is a high performance MQTT broker and client library that aims to be fully compliant with MQTT 3.1 and 3.1.1 specs. The primary package that's of interest is package [service](http://godoc.org/code.surgemq.com/service). It provides the MQTT Server and Client services in a library form.
 
 SurgeMQ development is currently **on hold**, unfortunately, due to my focus on [Sequence](http://github.com/trustpath/sequence). If you would like to contribute and become a collaborator, please let me know. There's quite a bit of interest for the project, and I would love to see it succeed. 
 
@@ -80,7 +80,7 @@ In addition, SurgeMQ has been tested with the following client libraries and it 
 
 ### Documentation
 
-Documentation is available at [godoc](http://godoc.org/github.com/surgemq/surgemq).
+Documentation is available at [godoc](http://godoc.org/code.surgemq.com).
 
 More information regarding the design of the SurgeMQ is available at [zen 3.1](http://surgemq.com).
 
@@ -109,7 +109,7 @@ limitations under the License.
 
 Then multiple clients can subscribe to results based on their different needs. For example, a client maybe only interested in any failed ping attempts, as that would indicate a host might be down. After a certain number of failures the client may then raise some type of flag to indicate host down.
 
-`pingmq` is available [here](https://github.com/surgemq/surgemq/tree/master/cmd/pingmq) and documentation is available at [godoc](http://godoc.org/github.com/surgemq/surgemq/cmd/pingmq). It utilizes [surge/ping](https://github.com/surge/ping) to perform the pings.
+`pingmq` is available [here](https://code.surgemq.com/tree/master/cmd/pingmq) and documentation is available at [godoc](http://godoc.org/code.surgemq.com/cmd/pingmq). It utilizes [surge/ping](https://github.com/surge/ping) to perform the pings.
 
 #### Server Example
 
@@ -133,7 +133,7 @@ svr.ListenAndServe("tcp://:1883")
 c := &Client{}
 
 // Creates a new MQTT CONNECT message and sets the proper parameters
-msg := message.NewConnectMessage()
+msg := messages.NewConnectMessage()
 msg.SetWillQos(1)
 msg.SetVersion(4)
 msg.SetCleanSession(true)
@@ -148,10 +148,10 @@ msg.SetPassword([]byte("verysecret"))
 c.Connect("tcp://127.0.0.1:1883", msg)
 
 // Creates a new SUBSCRIBE message to subscribe to topic "abc"
-submsg := message.NewSubscribeMessage()
+submsg := messages.NewSubscribeMessage()
 submsg.AddTopic([]byte("abc"), 0)
 
-// Subscribes to the topic by sending the message. The first nil in the function
+// Subscribes to the topic by sending the messages. The first nil in the function
 // call is a OnCompleteFunc that should handle the SUBACK message from the server.
 // Nil means we are ignoring the SUBACK messages. The second nil should be a
 // OnPublishFunc that handles any messages send to the client because of this
@@ -159,7 +159,7 @@ submsg.AddTopic([]byte("abc"), 0)
 c.Subscribe(submsg, nil, nil)
 
 // Creates a new PUBLISH message with the appropriate contents for publishing
-pubmsg := message.NewPublishMessage()
+pubmsg := messages.NewPublishMessage()
 pubmsg.SetPacketId(pktid)
 pubmsg.SetTopic([]byte("abc"))
 pubmsg.SetPayload(make([]byte, 1024))

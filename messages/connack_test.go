@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"testing"
@@ -45,8 +45,8 @@ func TestConnackMessageDecode(t *testing.T) {
 
 	n, err := msg.Decode(msgBytes)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
 	require.False(t, msg.SessionPresent(), "Error decoding session present flag.")
 	require.Equal(t, ConnectionAccepted, msg.ReturnCode(), "Error decoding return code.")
 }
@@ -63,7 +63,7 @@ func TestConnackMessageDecode2(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	require.Error(t, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding messages.")
 }
 
 // testing wrong message size
@@ -77,7 +77,7 @@ func TestConnackMessageDecode3(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	require.Error(t, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding messages.")
 }
 
 // testing wrong reserve bits
@@ -92,7 +92,7 @@ func TestConnackMessageDecode4(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	require.Error(t, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding messages.")
 }
 
 // testing invalid return code
@@ -107,7 +107,7 @@ func TestConnackMessageDecode5(t *testing.T) {
 	msg := NewConnackMessage()
 
 	_, err := msg.Decode(msgBytes)
-	require.Error(t, err, "Error decoding message.")
+	require.Error(t, err, "Error decoding messages.")
 }
 
 func TestConnackMessageEncode(t *testing.T) {
@@ -125,9 +125,9 @@ func TestConnackMessageEncode(t *testing.T) {
 	dst := make([]byte, 10)
 	n, err := msg.Encode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error encoding message.")
-	require.Equal(t, msgBytes, dst[:n], "Error encoding connack message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error encoding messages.")
+	require.Equal(t, msgBytes, dst[:n], "Error encoding connack messages.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -143,18 +143,18 @@ func TestConnackDecodeEncodeEquiv(t *testing.T) {
 	msg := NewConnackMessage()
 	n, err := msg.Decode(msgBytes)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
-	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding messages.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding messages.")
 
 	n3, err := msg.Decode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding messages.")
 }

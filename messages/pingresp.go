@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 // A PINGRESP Packet is sent by the Server to the Client in response to a PINGREQ
 // Packet. It indicates that the Server is alive.
@@ -22,7 +22,7 @@ type PingrespMessage struct {
 
 var _ Message = (*PingrespMessage)(nil)
 
-// NewPingrespMessage creates a new PINGRESP message.
+// NewPingrespMessage creates a new PINGRESP messages.
 func NewPingrespMessage() *PingrespMessage {
 	msg := &PingrespMessage{}
 	msg.SetType(PINGRESP)

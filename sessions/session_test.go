@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 func TestSessionInit(t *testing.T) {
@@ -67,14 +67,14 @@ func TestSessionPublishAckqueue(t *testing.T) {
 
 	require.Equal(t, 12, sess.Pub1ack.len())
 
-	ack1 := message.NewPubackMessage()
+	ack1 := messages.NewPubackMessage()
 	ack1.SetPacketId(1)
 	sess.Pub1ack.Ack(ack1)
 
 	acked := sess.Pub1ack.Acked()
 	require.Equal(t, 0, len(acked))
 
-	ack0 := message.NewPubackMessage()
+	ack0 := messages.NewPubackMessage()
 	ack0.SetPacketId(0)
 	sess.Pub1ack.Ack(ack0)
 
@@ -82,8 +82,8 @@ func TestSessionPublishAckqueue(t *testing.T) {
 	require.Equal(t, 2, len(acked))
 }
 
-func newConnectMessage() *message.ConnectMessage {
-	msg := message.NewConnectMessage()
+func newConnectMessage() *messages.ConnectMessage {
+	msg := messages.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(4)
 	msg.SetCleanSession(true)
@@ -97,8 +97,8 @@ func newConnectMessage() *message.ConnectMessage {
 	return msg
 }
 
-func newPublishMessage(pktid uint16, qos byte) *message.PublishMessage {
-	msg := message.NewPublishMessage()
+func newPublishMessage(pktid uint16, qos byte) *messages.PublishMessage {
+	msg := messages.NewPublishMessage()
 	msg.SetPacketId(pktid)
 	msg.SetTopic([]byte("abc"))
 	msg.SetPayload([]byte("abc"))

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 // The UNSUBACK Packet is sent by the Server to the Client to confirm receipt of an
 // UNSUBSCRIBE Packet.
@@ -22,7 +22,7 @@ type UnsubackMessage struct {
 
 var _ Message = (*UnsubackMessage)(nil)
 
-// NewUnsubackMessage creates a new UNSUBACK message.
+// NewUnsubackMessage creates a new UNSUBACK messages.
 func NewUnsubackMessage() *UnsubackMessage {
 	msg := &UnsubackMessage{}
 	msg.SetType(UNSUBACK)

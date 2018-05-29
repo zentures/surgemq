@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surge/glog"
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/topics"
+	""
+	"code.surgemq.com/messages"
+	"code.surgemq.com/topics"
 )
 
 var authenticator string = "mockSuccess"
@@ -71,14 +71,14 @@ func TestServiceWillDelivery(t *testing.T) {
 	require.NotNil(t, c3)
 	defer topics.Unregister(c3.svc.sess.ID())
 
-	sub := message.NewSubscribeMessage()
+	sub := messages.NewSubscribeMessage()
 	sub.AddTopic([]byte("will"), 1)
 
 	subdone := int64(0)
 	willdone := int64(0)
 
 	c2.Subscribe(sub,
-		func(msg, ack message.Message, err error) error {
+		func(msg, ack messages.Message, err error) error {
 			subs := atomic.AddInt64(&subdone, 1)
 			if subs == int64(subscribers-1) {
 				c1.Disconnect()
@@ -86,8 +86,8 @@ func TestServiceWillDelivery(t *testing.T) {
 
 			return nil
 		},
-		func(msg *message.PublishMessage) error {
-			require.Equal(t, message.QosAtLeastOnce, msg.QoS())
+		func(msg *messages.PublishMessage) error {
+			require.Equal(t, messages.QosAtLeastOnce, msg.QoS())
 			require.Equal(t, []byte("send me home"), msg.Payload())
 
 			will := atomic.AddInt64(&willdone, 1)
@@ -99,7 +99,7 @@ func TestServiceWillDelivery(t *testing.T) {
 		})
 
 	c3.Subscribe(sub,
-		func(msg, ack message.Message, err error) error {
+		func(msg, ack messages.Message, err error) error {
 			subs := atomic.AddInt64(&subdone, 1)
 			if subs == int64(subscribers-1) {
 				c1.Disconnect()
@@ -107,8 +107,8 @@ func TestServiceWillDelivery(t *testing.T) {
 
 			return nil
 		},
-		func(msg *message.PublishMessage) error {
-			require.Equal(t, message.QosAtLeastOnce, msg.QoS())
+		func(msg *messages.PublishMessage) error {
+			require.Equal(t, messages.QosAtLeastOnce, msg.QoS())
 			require.Equal(t, []byte("send me home"), msg.Payload())
 
 			will := atomic.AddInt64(&willdone, 1)
@@ -139,15 +139,15 @@ func TestServiceSubUnsub(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		c.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				unsub := newUnsubscribeMessage()
-				return c.Unsubscribe(unsub, func(msg, ack message.Message, err error) error {
+				return c.Unsubscribe(unsub, func(msg, ack messages.Message, err error) error {
 					close(done)
 					return nil
 				})
 
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				return nil
 			})
 
@@ -161,7 +161,7 @@ func TestServiceSubUnsub(t *testing.T) {
 
 func TestServiceSubRetain(t *testing.T) {
 	runClientServerTests(t, func(c *Client) {
-		rmsg := message.NewPublishMessage()
+		rmsg := messages.NewPublishMessage()
 		rmsg.SetRetain(true)
 		rmsg.SetQoS(0)
 		rmsg.SetTopic([]byte("abc"))
@@ -175,15 +175,15 @@ func TestServiceSubRetain(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		c.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				unsub := newUnsubscribeMessage()
-				return c.Unsubscribe(unsub, func(msg, ack message.Message, err error) error {
+				return c.Unsubscribe(unsub, func(msg, ack messages.Message, err error) error {
 					close(done)
 					return nil
 				})
 
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				require.Equal(t, msg.Topic(), []byte("abc"))
 				require.Equal(t, msg.Payload(), []byte("this is a test"))
 				return nil
@@ -208,17 +208,17 @@ func TestServiceSub0Pub0(t *testing.T) {
 
 		sub := newSubscribeMessage(0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				assertPublishMessage(t, msg, 0)
 
 				count++
 
 				if count == 10 {
-					glog.Debugf("got 10 pub0")
+					commons.Log.Debug("got 10 pub0")
 					close(done2)
 				}
 
@@ -259,17 +259,17 @@ func TestServiceSub1Pub0(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				assertPublishMessage(t, msg, 0)
 
 				count++
 
 				if count == 10 {
-					glog.Debugf("got 10 pub0")
+					commons.Log.Debug("got 10 pub0")
 					close(done2)
 				}
 
@@ -310,11 +310,11 @@ func TestServiceSub0Pub1(t *testing.T) {
 
 		sub := newSubscribeMessage(0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				require.FailNow(t, "Should not have received any publish message")
 				return nil
 			})
@@ -329,15 +329,15 @@ func TestServiceSub0Pub1(t *testing.T) {
 			msg := newPublishMessage(i, 1)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) error {
+				func(msg, ack messages.Message, err error) error {
 					ackcnt++
 
 					require.NoError(t, err)
 
-					pub, ok := msg.(*message.PublishMessage)
+					pub, ok := msg.(*messages.PublishMessage)
 					require.True(t, ok)
 
-					puback, ok := ack.(*message.PubackMessage)
+					puback, ok := ack.(*messages.PubackMessage)
 					require.True(t, ok)
 
 					require.Equal(t, pub.PacketId(), puback.PacketId())
@@ -377,11 +377,11 @@ func TestServiceSub1Pub1(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				count++
 
 				assertPublishMessage(t, msg, 1)
@@ -403,15 +403,15 @@ func TestServiceSub1Pub1(t *testing.T) {
 			msg := newPublishMessage(i, 1)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) error {
+				func(msg, ack messages.Message, err error) error {
 					ackcnt++
 
 					require.NoError(t, err)
 
-					pub, ok := msg.(*message.PublishMessage)
+					pub, ok := msg.(*messages.PublishMessage)
 					require.True(t, ok)
 
-					puback, ok := ack.(*message.PubackMessage)
+					puback, ok := ack.(*messages.PubackMessage)
 					require.True(t, ok)
 
 					require.Equal(t, pub.PacketId(), puback.PacketId())
@@ -455,11 +455,11 @@ func TestServiceSub2Pub1(t *testing.T) {
 
 		sub := newSubscribeMessage(2)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				count++
 
 				assertPublishMessage(t, msg, 1)
@@ -481,15 +481,15 @@ func TestServiceSub2Pub1(t *testing.T) {
 			msg := newPublishMessage(i, 1)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) error {
+				func(msg, ack messages.Message, err error) error {
 					ackcnt++
 
 					require.NoError(t, err)
 
-					pub, ok := msg.(*message.PublishMessage)
+					pub, ok := msg.(*messages.PublishMessage)
 					require.True(t, ok)
 
-					puback, ok := ack.(*message.PubackMessage)
+					puback, ok := ack.(*messages.PubackMessage)
 					require.True(t, ok)
 
 					require.Equal(t, pub.PacketId(), puback.PacketId())
@@ -531,11 +531,11 @@ func TestServiceSub1Pub2(t *testing.T) {
 
 		sub := newSubscribeMessage(1)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				require.FailNow(t, "Should not have received any publish message")
 				return nil
 			})
@@ -550,15 +550,15 @@ func TestServiceSub1Pub2(t *testing.T) {
 			msg := newPublishMessage(i, 2)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) error {
+				func(msg, ack messages.Message, err error) error {
 					ackcnt++
 
 					require.NoError(t, err)
 
-					pub, ok := msg.(*message.PublishMessage)
+					pub, ok := msg.(*messages.PublishMessage)
 					require.True(t, ok)
 
-					pubcomp, ok := ack.(*message.PubcompMessage)
+					pubcomp, ok := ack.(*messages.PubcompMessage)
 					require.True(t, ok)
 
 					require.Equal(t, pub.PacketId(), pubcomp.PacketId())
@@ -598,11 +598,11 @@ func TestServiceSub2Pub2(t *testing.T) {
 
 		sub := newSubscribeMessage(2)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				close(done)
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				count++
 
 				assertPublishMessage(t, msg, 2)
@@ -624,15 +624,15 @@ func TestServiceSub2Pub2(t *testing.T) {
 			msg := newPublishMessage(i, 2)
 
 			svc.Publish(msg,
-				func(msg, ack message.Message, err error) error {
+				func(msg, ack messages.Message, err error) error {
 					ackcnt++
 
 					require.NoError(t, err)
 
-					pub, ok := msg.(*message.PublishMessage)
+					pub, ok := msg.(*messages.PublishMessage)
 					require.True(t, ok)
 
-					pubcomp, ok := ack.(*message.PubcompMessage)
+					pubcomp, ok := ack.(*messages.PubcompMessage)
 					require.True(t, ok)
 
 					require.Equal(t, pub.PacketId(), pubcomp.PacketId())
@@ -663,7 +663,7 @@ func TestServiceSub2Pub2(t *testing.T) {
 	})
 }
 
-func assertPublishMessage(t *testing.T, msg *message.PublishMessage, qos byte) {
+func assertPublishMessage(t *testing.T, msg *messages.PublishMessage, qos byte) {
 	require.Equal(t, "abc", string(msg.Payload()))
 	require.Equal(t, qos, msg.QoS())
 }

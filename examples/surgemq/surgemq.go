@@ -21,8 +21,8 @@ import (
 	"os/signal"
 	"runtime/pprof"
 
-	"github.com/surge/glog"
-	"github.com/surgemq/surgemq/service"
+	""
+	"code.surgemq.com/service"
 )
 
 var (
@@ -82,10 +82,10 @@ func main() {
 	signal.Notify(sigchan, os.Interrupt, os.Kill)
 	go func() {
 		sig := <-sigchan
-		glog.Errorf("Existing due to trapped signal; %v", sig)
+		commons.Log.Error("Existing due to trapped signal; %v", sig)
 
 		if f != nil {
-			glog.Errorf("Stopping profile")
+			commons.Log.Error("Stopping profile")
 			pprof.StopCPUProfile()
 			f.Close()
 		}
@@ -113,6 +113,6 @@ func main() {
 	/* create plain MQTT listener */
 	err = svr.ListenAndServe(mqttaddr)
 	if err != nil {
-		glog.Errorf("surgemq/main: %v", err)
+		commons.Log.Error("surgemq/main: %v", err)
 	}
 }

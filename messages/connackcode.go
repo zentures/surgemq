@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 // ConnackCode is the type representing the return code in the CONNACK message,
 // returned after the initial CONNECT message

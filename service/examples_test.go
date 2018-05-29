@@ -14,7 +14,7 @@
 
 package service
 
-import "github.com/surgemq/message"
+import "code.surgemq.com/messages"
 
 func ExampleServer() {
 	// Create a new server
@@ -35,7 +35,7 @@ func ExampleClient() {
 	c := &Client{}
 
 	// Creates a new MQTT CONNECT message and sets the proper parameters
-	msg := message.NewConnectMessage()
+	msg := messages.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(4)
 	msg.SetCleanSession(true)
@@ -50,10 +50,10 @@ func ExampleClient() {
 	c.Connect("tcp://127.0.0.1:1883", msg)
 
 	// Creates a new SUBSCRIBE message to subscribe to topic "abc"
-	submsg := message.NewSubscribeMessage()
+	submsg := messages.NewSubscribeMessage()
 	submsg.AddTopic([]byte("abc"), 0)
 
-	// Subscribes to the topic by sending the message. The first nil in the function
+	// Subscribes to the topic by sending the messages. The first nil in the function
 	// call is a OnCompleteFunc that should handle the SUBACK message from the server.
 	// Nil means we are ignoring the SUBACK messages. The second nil should be a
 	// OnPublishFunc that handles any messages send to the client because of this
@@ -61,7 +61,7 @@ func ExampleClient() {
 	c.Subscribe(submsg, nil, nil)
 
 	// Creates a new PUBLISH message with the appropriate contents for publishing
-	pubmsg := message.NewPublishMessage()
+	pubmsg := messages.NewPublishMessage()
 	pubmsg.SetTopic([]byte("abc"))
 	pubmsg.SetPayload(make([]byte, 1024))
 	pubmsg.SetQoS(0)

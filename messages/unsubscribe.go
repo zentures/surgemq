@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ type UnsubscribeMessage struct {
 
 var _ Message = (*UnsubscribeMessage)(nil)
 
-// NewUnsubscribeMessage creates a new UNSUBSCRIBE message.
+// NewUnsubscribeMessage creates a new UNSUBSCRIBE messages.
 func NewUnsubscribeMessage() *UnsubscribeMessage {
 	msg := &UnsubscribeMessage{}
 	msg.SetType(UNSUBSCRIBE)
@@ -52,7 +52,7 @@ func (this *UnsubscribeMessage) Topics() [][]byte {
 	return this.topics
 }
 
-// AddTopic adds a single topic to the message.
+// AddTopic adds a single topic to the messages.
 func (this *UnsubscribeMessage) AddTopic(topic []byte) {
 	if this.TopicExists(topic) {
 		return
@@ -62,7 +62,7 @@ func (this *UnsubscribeMessage) AddTopic(topic []byte) {
 	this.dirty = true
 }
 
-// RemoveTopic removes a single topic from the list of existing ones in the message.
+// RemoveTopic removes a single topic from the list of existing ones in the messages.
 // If topic does not exist it just does nothing.
 func (this *UnsubscribeMessage) RemoveTopic(topic []byte) {
 	var i int

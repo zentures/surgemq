@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 func TestAckQueueOutOfOrder(t *testing.T) {
@@ -32,7 +32,7 @@ func TestAckQueueOutOfOrder(t *testing.T) {
 
 	require.Equal(t, 12, q.len())
 
-	ack1 := message.NewPubackMessage()
+	ack1 := messages.NewPubackMessage()
 	ack1.SetPacketId(1)
 	q.Ack(ack1)
 
@@ -40,7 +40,7 @@ func TestAckQueueOutOfOrder(t *testing.T) {
 
 	require.Equal(t, 0, len(acked))
 
-	ack0 := message.NewPubackMessage()
+	ack0 := messages.NewPubackMessage()
 	ack0.SetPacketId(0)
 	q.Ack(ack0)
 

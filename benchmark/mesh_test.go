@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/surge/glog"
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/service"
+	""
+	"code.surgemq.com/messages"
+	"code.surgemq.com/service"
 )
 
 // Usage: go test -run=Mesh
@@ -50,8 +50,8 @@ func TestMesh(t *testing.T) {
 
 	wg.Wait()
 
-	glog.Infof("Total Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", totalSent, sentSince, int(float64(sentSince)/float64(totalSent)), int(float64(totalSent)/(float64(sentSince)/float64(time.Second))))
-	glog.Infof("Total Received %d messages in %d ns, %d ns/msg, %d msgs/sec", totalRcvd, rcvdSince, int(float64(rcvdSince)/float64(totalRcvd)), int(float64(totalRcvd)/(float64(rcvdSince)/float64(time.Second))))
+	commons.Log.Info("Total Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", totalSent, sentSince, int(float64(sentSince)/float64(totalSent)), int(float64(totalSent)/(float64(sentSince)/float64(time.Second))))
+	commons.Log.Info("Total Received %d messages in %d ns, %d ns/msg, %d msgs/sec", totalRcvd, rcvdSince, int(float64(rcvdSince)/float64(totalRcvd)), int(float64(totalRcvd)/(float64(rcvdSince)/float64(time.Second))))
 }
 
 func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
@@ -69,20 +69,20 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 
 		sub := newSubscribeMessage("test", 0)
 		svc.Subscribe(sub,
-			func(msg, ack message.Message, err error) error {
+			func(msg, ack messages.Message, err error) error {
 				subs := atomic.AddInt64(&subdone, 1)
 				if subs == int64(publishers) {
 					close(done)
 				}
 				return nil
 			},
-			func(msg *message.PublishMessage) error {
+			func(msg *messages.PublishMessage) error {
 				if received == 0 {
 					now = time.Now()
 				}
 
 				received++
-				//glog.Debugf("(surgemq%d) messages received=%d", cid, received)
+				//commons.Log.Debug("(surgemq%d) messages received=%d", cid, received)
 				since = time.Since(now).Nanoseconds()
 
 				if received == expected {
@@ -95,12 +95,12 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 		select {
 		case <-done:
 		case <-time.After(time.Second * time.Duration(publishers)):
-			glog.Infof("(surgemq%d) Timed out waiting for subscribe response", cid)
+			commons.Log.Info("(surgemq%d) Timed out waiting for subscribe response", cid)
 			return
 		}
 
 		payload := make([]byte, size)
-		msg := message.NewPublishMessage()
+		msg := messages.NewPublishMessage()
 		msg.SetTopic(topic)
 		msg.SetQoS(qos)
 
@@ -128,13 +128,13 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 			}
 			statMu.Unlock()
 
-			glog.Debugf("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
+			commons.Log.Debug("(surgemq%d) Sent %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, sent, since, int(float64(since)/float64(cnt)), int(float64(sent)/(float64(since)/float64(time.Second))))
 		}()
 
 		select {
 		case <-done2:
 		case <-time.Tick(time.Second * time.Duration(nap*publishers)):
-			glog.Errorf("Timed out waiting for messages to be received.")
+			commons.Log.Error("Timed out waiting for messages to be received.")
 		}
 
 		statMu.Lock()
@@ -145,6 +145,6 @@ func startMeshClient(t testing.TB, cid int, wg *sync.WaitGroup) {
 		}
 		statMu.Unlock()
 
-		glog.Debugf("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
+		commons.Log.Debug("(surgemq%d) Received %d messages in %d ns, %d ns/msg, %d msgs/sec", cid, received, since, int(float64(since)/float64(cnt)), int(float64(received)/(float64(since)/float64(time.Second))))
 	})
 }

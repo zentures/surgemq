@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import "fmt"
 
@@ -29,7 +29,7 @@ type SubackMessage struct {
 
 var _ Message = (*SubackMessage)(nil)
 
-// NewSubackMessage creates a new SUBACK message.
+// NewSubackMessage creates a new SUBACK messages.
 func NewSubackMessage() *SubackMessage {
 	msg := &SubackMessage{}
 	msg.SetType(SUBACK)
@@ -37,17 +37,17 @@ func NewSubackMessage() *SubackMessage {
 	return msg
 }
 
-// String returns a string representation of the message.
+// String returns a string representation of the messages.
 func (this SubackMessage) String() string {
 	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v", this.header, this.PacketId(), this.returnCodes)
 }
 
-// ReturnCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
+// ReturnCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE messages.
 func (this *SubackMessage) ReturnCodes() []byte {
 	return this.returnCodes
 }
 
-// AddReturnCodes sets the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
+// AddReturnCodes sets the list of QoS returns from the subscriptions sent in the SUBSCRIBE messages.
 // An error is returned if any of the QoS values are not valid.
 func (this *SubackMessage) AddReturnCodes(ret []byte) error {
 	for _, c := range ret {

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 const (
@@ -46,13 +46,13 @@ type Session struct {
 	Pingack *Ackqueue
 
 	// cmsg is the CONNECT message
-	Cmsg *message.ConnectMessage
+	Cmsg *messages.ConnectMessage
 
 	// Will message to publish if connect is closed unexpectedly
-	Will *message.PublishMessage
+	Will *messages.PublishMessage
 
 	// Retained publish message
-	Retained *message.PublishMessage
+	Retained *messages.PublishMessage
 
 	// cbuf is the CONNECT message buffer, this is for storing all the will stuff
 	cbuf []byte
@@ -72,7 +72,7 @@ type Session struct {
 	id string
 }
 
-func (this *Session) Init(msg *message.ConnectMessage) error {
+func (this *Session) Init(msg *messages.ConnectMessage) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -81,7 +81,7 @@ func (this *Session) Init(msg *message.ConnectMessage) error {
 	}
 
 	this.cbuf = make([]byte, msg.Len())
-	this.Cmsg = message.NewConnectMessage()
+	this.Cmsg = messages.NewConnectMessage()
 
 	if _, err := msg.Encode(this.cbuf); err != nil {
 		return err
@@ -92,7 +92,7 @@ func (this *Session) Init(msg *message.ConnectMessage) error {
 	}
 
 	if this.Cmsg.WillFlag() {
-		this.Will = message.NewPublishMessage()
+		this.Will = messages.NewPublishMessage()
 		this.Will.SetQoS(this.Cmsg.WillQos())
 		this.Will.SetTopic(this.Cmsg.WillTopic())
 		this.Will.SetPayload(this.Cmsg.WillMessage())
@@ -115,12 +115,12 @@ func (this *Session) Init(msg *message.ConnectMessage) error {
 	return nil
 }
 
-func (this *Session) Update(msg *message.ConnectMessage) error {
+func (this *Session) Update(msg *messages.ConnectMessage) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	this.cbuf = make([]byte, msg.Len())
-	this.Cmsg = message.NewConnectMessage()
+	this.Cmsg = messages.NewConnectMessage()
 
 	if _, err := msg.Encode(this.cbuf); err != nil {
 		return err
@@ -133,12 +133,12 @@ func (this *Session) Update(msg *message.ConnectMessage) error {
 	return nil
 }
 
-func (this *Session) RetainMessage(msg *message.PublishMessage) error {
+func (this *Session) RetainMessage(msg *messages.PublishMessage) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	this.rbuf = make([]byte, msg.Len())
-	this.Retained = message.NewPublishMessage()
+	this.Retained = messages.NewPublishMessage()
 
 	if _, err := msg.Encode(this.rbuf); err != nil {
 		return err

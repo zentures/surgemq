@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 func TestReadMessageSuccess(t *testing.T) {
 	msgBytes := []byte{
-		byte(message.CONNECT << 4),
+		byte(messages.CONNECT << 4),
 		60,
 		0, // Length MSB (0)
 		4, // Length LSB (4)
@@ -53,15 +53,15 @@ func TestReadMessageSuccess(t *testing.T) {
 
 	svc := newTestBuffer(t, msgBytes)
 
-	m, n, err := svc.readMessage(message.CONNECT, 62)
+	m, n, err := svc.readMessage(messages.CONNECT, 62)
 
-	require.NoError(t, err, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
 
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
 
-	msg := m.(*message.ConnectMessage)
+	msg := m.(*messages.ConnectMessage)
 
-	require.Equal(t, message.QosAtLeastOnce, msg.WillQos(), "Incorrect Will QoS")
+	require.Equal(t, messages.QosAtLeastOnce, msg.WillQos(), "Incorrect Will QoS")
 
 	require.Equal(t, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
 
@@ -79,7 +79,7 @@ func TestReadMessageSuccess(t *testing.T) {
 // Wrong messag type
 func TestReadMessageError(t *testing.T) {
 	msgBytes := []byte{
-		byte(message.RESERVED << 4), // <--- WRONG
+		byte(messages.RESERVED << 4), // <--- WRONG
 		60,
 		0, // Length MSB (0)
 		4, // Length LSB (4)
@@ -107,7 +107,7 @@ func TestReadMessageError(t *testing.T) {
 
 	svc := newTestBuffer(t, msgBytes)
 
-	_, _, err := svc.readMessage(message.CONNECT, 62)
+	_, _, err := svc.readMessage(messages.CONNECT, 62)
 
 	require.Error(t, err)
 }
@@ -115,7 +115,7 @@ func TestReadMessageError(t *testing.T) {
 // Wrong messag size
 func TestReadMessageError2(t *testing.T) {
 	msgBytes := []byte{
-		byte(message.CONNECT << 4),
+		byte(messages.CONNECT << 4),
 		62, // <--- WRONG
 		0,  // Length MSB (0)
 		4,  // Length LSB (4)
@@ -143,14 +143,14 @@ func TestReadMessageError2(t *testing.T) {
 
 	svc := newTestBuffer(t, msgBytes)
 
-	_, _, err := svc.readMessage(message.CONNECT, 64)
+	_, _, err := svc.readMessage(messages.CONNECT, 64)
 
 	require.Equal(t, io.EOF, err)
 }
 
 func TestWriteMessage(t *testing.T) {
 	msgBytes := []byte{
-		byte(message.CONNECT << 4),
+		byte(messages.CONNECT << 4),
 		60,
 		0, // Length MSB (0)
 		4, // Length LSB (4)
@@ -187,15 +187,15 @@ func TestWriteMessage(t *testing.T) {
 
 	n, err := svc.writeMessage(msg)
 
-	require.NoError(t, err, "error decoding message.")
+	require.NoError(t, err, "error decoding messages.")
 
-	require.Equal(t, len(msgBytes), n, "error decoding message.")
+	require.Equal(t, len(msgBytes), n, "error decoding messages.")
 
 	dst, err := svc.out.ReadPeek(len(msgBytes))
 
 	require.NoError(t, err)
 
-	require.Equal(t, msgBytes, dst, "error decoding message.")
+	require.Equal(t, msgBytes, dst, "error decoding messages.")
 }
 
 func newTestBuffer(t *testing.T, msgBytes []byte) *service {

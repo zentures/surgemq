@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"bytes"
@@ -108,7 +108,7 @@ const (
 	// CONNACK: Server to Client. Connect acknowledgement.
 	CONNACK
 
-	// PUBLISH: Client to Server, or Server to Client. Publish message.
+	// PUBLISH: Client to Server, or Server to Client. Publish messages.
 	PUBLISH
 
 	// PUBACK: Client to Server, or Server to Client. Publish acknowledgment for

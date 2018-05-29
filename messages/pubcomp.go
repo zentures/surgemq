@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 // The PUBCOMP Packet is the response to a PUBREL Packet. It is the fourth and
 // final packet of the QoS 2 protocol exchange.
@@ -22,7 +22,7 @@ type PubcompMessage struct {
 
 var _ Message = (*PubcompMessage)(nil)
 
-// NewPubcompMessage creates a new PUBCOMP message.
+// NewPubcompMessage creates a new PUBCOMP messages.
 func NewPubcompMessage() *PubcompMessage {
 	msg := &PubcompMessage{}
 	msg.SetType(PUBCOMP)

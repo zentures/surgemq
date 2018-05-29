@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 func TestNextTopicLevelSuccess(t *testing.T) {
@@ -466,7 +466,7 @@ func TestRNodeMatch(t *testing.T) {
 	err = n.rinsert(msg3.Topic(), msg3)
 	require.NoError(t, err)
 
-	var msglist []*message.PublishMessage
+	var msglist []*messages.PublishMessage
 
 	// ---
 
@@ -581,7 +581,7 @@ func TestMemTopicsRetained(t *testing.T) {
 	err = mgr.Retain(msg3)
 	require.NoError(t, err)
 
-	var msglist []*message.PublishMessage
+	var msglist []*messages.PublishMessage
 
 	// ---
 
@@ -639,8 +639,8 @@ func TestMemTopicsRetained(t *testing.T) {
 	require.Equal(t, 3, len(msglist))
 }
 
-func newPublishMessageLarge(topic []byte, qos byte) *message.PublishMessage {
-	msg := message.NewPublishMessage()
+func newPublishMessageLarge(topic []byte, qos byte) *messages.PublishMessage {
+	msg := messages.NewPublishMessage()
 	msg.SetTopic(topic)
 	msg.SetPayload(make([]byte, 1024))
 	msg.SetQoS(qos)

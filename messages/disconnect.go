@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import "fmt"
 
@@ -24,7 +24,7 @@ type DisconnectMessage struct {
 
 var _ Message = (*DisconnectMessage)(nil)
 
-// NewDisconnectMessage creates a new DISCONNECT message.
+// NewDisconnectMessage creates a new DISCONNECT messages.
 func NewDisconnectMessage() *DisconnectMessage {
 	msg := &DisconnectMessage{}
 	msg.SetType(DISCONNECT)

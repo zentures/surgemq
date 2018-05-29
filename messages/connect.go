@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"encoding/binary"
@@ -61,7 +61,7 @@ type ConnectMessage struct {
 
 var _ Message = (*ConnectMessage)(nil)
 
-// NewConnectMessage creates a new CONNECT message.
+// NewConnectMessage creates a new CONNECT messages.
 func NewConnectMessage() *ConnectMessage {
 	msg := &ConnectMessage{}
 	msg.SetType(CONNECT)
@@ -348,7 +348,7 @@ func (this *ConnectMessage) Len() int {
 //
 // Caller should call ValidConnackError(err) to see if the returned error is
 // a Connack error. If so, caller should send the Client back the corresponding
-// CONNACK message.
+// CONNACK messages.
 func (this *ConnectMessage) Decode(src []byte) (int, error) {
 	total := 0
 
@@ -622,7 +622,7 @@ func (this *ConnectMessage) msglen() int {
 //
 //		"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 func (this *ConnectMessage) validClientId(cid []byte) bool {
-	// Fixed https://github.com/surgemq/surgemq/issues/4
+	// Fixed https://code.surgemq.com/issues/4
 	//if len(cid) > 23 {
 	//	return false
 	//}

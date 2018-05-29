@@ -25,10 +25,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/surge/glog"
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/sessions"
-	"github.com/surgemq/surgemq/topics"
+	""
+	"code.surgemq.com/messages"
+	"code.surgemq.com/sessions"
+	"code.surgemq.com/topics"
 )
 
 var (
@@ -106,7 +106,7 @@ func startServiceN(t testing.TB, u *url.URL, wg *sync.WaitGroup, ready1, ready2 
 	<-ready2
 
 	for _, svc := range svr.svcs {
-		glog.Infof("Stopping service %d", svc.id)
+		commons.Log.Info("Stopping service %d", svc.id)
 		svc.stop()
 	}
 
@@ -132,15 +132,15 @@ func connectToServer(t testing.TB, uri string) *Client {
 	return c
 }
 
-func newPubrelMessage(pktid uint16) *message.PubrelMessage {
-	msg := message.NewPubrelMessage()
+func newPubrelMessage(pktid uint16) *messages.PubrelMessage {
+	msg := messages.NewPubrelMessage()
 	msg.SetPacketId(pktid)
 
 	return msg
 }
 
-func newPublishMessage(pktid uint16, qos byte) *message.PublishMessage {
-	msg := message.NewPublishMessage()
+func newPublishMessage(pktid uint16, qos byte) *messages.PublishMessage {
+	msg := messages.NewPublishMessage()
 	msg.SetPacketId(pktid)
 	msg.SetTopic([]byte("abc"))
 	msg.SetPayload([]byte("abc"))
@@ -149,8 +149,8 @@ func newPublishMessage(pktid uint16, qos byte) *message.PublishMessage {
 	return msg
 }
 
-func newPublishMessageLarge(pktid uint16, qos byte) *message.PublishMessage {
-	msg := message.NewPublishMessage()
+func newPublishMessageLarge(pktid uint16, qos byte) *messages.PublishMessage {
+	msg := messages.NewPublishMessage()
 	msg.SetPacketId(pktid)
 	msg.SetTopic([]byte("abc"))
 	msg.SetPayload(make([]byte, 1024))
@@ -159,22 +159,22 @@ func newPublishMessageLarge(pktid uint16, qos byte) *message.PublishMessage {
 	return msg
 }
 
-func newSubscribeMessage(qos byte) *message.SubscribeMessage {
-	msg := message.NewSubscribeMessage()
+func newSubscribeMessage(qos byte) *messages.SubscribeMessage {
+	msg := messages.NewSubscribeMessage()
 	msg.AddTopic([]byte("abc"), qos)
 
 	return msg
 }
 
-func newUnsubscribeMessage() *message.UnsubscribeMessage {
-	msg := message.NewUnsubscribeMessage()
+func newUnsubscribeMessage() *messages.UnsubscribeMessage {
+	msg := messages.NewUnsubscribeMessage()
 	msg.AddTopic([]byte("abc"))
 
 	return msg
 }
 
-func newConnectMessage() *message.ConnectMessage {
-	msg := message.NewConnectMessage()
+func newConnectMessage() *messages.ConnectMessage {
+	msg := messages.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(4)
 	msg.SetCleanSession(true)
@@ -190,7 +190,7 @@ func newConnectMessage() *message.ConnectMessage {
 
 func newConnectMessageBuffer() *bufio.Reader {
 	msgBytes := []byte{
-		byte(message.CONNECT << 4),
+		byte(messages.CONNECT << 4),
 		60,
 		0, // Length MSB (0)
 		4, // Length LSB (4)

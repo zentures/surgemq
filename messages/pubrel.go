@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 // A PUBREL Packet is the response to a PUBREC Packet. It is the third packet of the
 // QoS 2 protocol exchange.
@@ -22,7 +22,7 @@ type PubrelMessage struct {
 
 var _ Message = (*PubrelMessage)(nil)
 
-// NewPubrelMessage creates a new PUBREL message.
+// NewPubrelMessage creates a new PUBREL messages.
 func NewPubrelMessage() *PubrelMessage {
 	msg := &PubrelMessage{}
 	msg.SetType(PUBREL)

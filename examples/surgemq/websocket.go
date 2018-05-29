@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/surge/glog"
+	""
 	"golang.org/x/net/websocket"
 	"io"
 	"net"
@@ -17,10 +17,10 @@ func DefaultListenAndServeWebsocket() error {
 }
 
 func AddWebsocketHandler(urlPattern string, uri string) error {
-	glog.Debugf("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri)
+	commons.Log.Debug("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri)
 	u, err := url.Parse(uri)
 	if err != nil {
-		glog.Errorf("surgemq/main: %v", err)
+		commons.Log.Error("surgemq/main: %v", err)
 		return err
 	}
 

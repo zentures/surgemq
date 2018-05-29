@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"testing"
@@ -58,9 +58,9 @@ func TestSubscribeMessageDecode(t *testing.T) {
 	msg := NewSubscribeMessage()
 	n, err := msg.Decode(msgBytes)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
-	require.Equal(t, SUBSCRIBE, msg.Type(), "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
+	require.Equal(t, SUBSCRIBE, msg.Type(), "Error decoding messages.")
 	require.Equal(t, 3, len(msg.Topics()), "Error decoding topics.")
 	require.True(t, msg.TopicExists([]byte("surgemq")), "Topic 'surgemq' should exist.")
 	require.Equal(t, 0, int(msg.TopicQos([]byte("surgemq"))), "Incorrect topic qos.")
@@ -114,9 +114,9 @@ func TestSubscribeMessageEncode(t *testing.T) {
 	dst := make([]byte, 100)
 	n, err := msg.Encode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
-	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding messages.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -144,18 +144,18 @@ func TestSubscribeDecodeEncodeEquiv(t *testing.T) {
 	msg := NewSubscribeMessage()
 	n, err := msg.Decode(msgBytes)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
-	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding messages.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding messages.")
 
 	n3, err := msg.Decode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding messages.")
 }

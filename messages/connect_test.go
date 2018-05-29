@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"testing"
@@ -93,7 +93,7 @@ func TestConnectMessageFields(t *testing.T) {
 	require.False(t, msg.WillFlag(), "Error setting will flag.")
 
 	msg.SetWillMessage([]byte("this is a will message"))
-	require.Equal(t, "this is a will message", string(msg.WillMessage()), "Error setting will message.")
+	require.Equal(t, "this is a will message", string(msg.WillMessage()), "Error setting will messages.")
 
 	require.True(t, msg.WillFlag(), "Error setting will flag.")
 
@@ -108,22 +108,22 @@ func TestConnectMessageFields(t *testing.T) {
 	require.True(t, msg.WillFlag(), "Error setting will topic.")
 
 	msg.SetUsername([]byte("myname"))
-	require.Equal(t, "myname", string(msg.Username()), "Error setting will message.")
+	require.Equal(t, "myname", string(msg.Username()), "Error setting will messages.")
 
 	require.True(t, msg.UsernameFlag(), "Error setting will flag.")
 
 	msg.SetUsername([]byte(""))
-	require.Equal(t, "", string(msg.Username()), "Error setting will message.")
+	require.Equal(t, "", string(msg.Username()), "Error setting will messages.")
 
 	require.False(t, msg.UsernameFlag(), "Error setting will flag.")
 
 	msg.SetPassword([]byte("myname"))
-	require.Equal(t, "myname", string(msg.Password()), "Error setting will message.")
+	require.Equal(t, "myname", string(msg.Password()), "Error setting will messages.")
 
 	require.True(t, msg.PasswordFlag(), "Error setting will flag.")
 
 	msg.SetPassword([]byte(""))
-	require.Equal(t, "", string(msg.Password()), "Error setting will message.")
+	require.Equal(t, "", string(msg.Password()), "Error setting will messages.")
 
 	require.False(t, msg.PasswordFlag(), "Error setting will flag.")
 }
@@ -159,8 +159,8 @@ func TestConnectMessageDecode(t *testing.T) {
 	msg := NewConnectMessage()
 	n, err := msg.Decode(msgBytes)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
 	require.Equal(t, 206, int(msg.connectFlags), "Incorrect flag value.")
 	require.Equal(t, 10, int(msg.KeepAlive()), "Incorrect KeepAlive value.")
 	require.Equal(t, "surgemq", string(msg.ClientId()), "Incorrect client ID value.")
@@ -318,9 +318,9 @@ func TestConnectMessageEncode(t *testing.T) {
 	dst := make([]byte, 100)
 	n, err := msg.Encode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
-	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding messages.")
 }
 
 // test to ensure encoding and decoding are the same
@@ -356,18 +356,18 @@ func TestConnectDecodeEncodeEquiv(t *testing.T) {
 	msg := NewConnectMessage()
 	n, err := msg.Decode(msgBytes)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n, "Error decoding messages.")
 
 	dst := make([]byte, 100)
 	n2, err := msg.Encode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n2, "Error decoding message.")
-	require.Equal(t, msgBytes, dst[:n2], "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n2, "Error decoding messages.")
+	require.Equal(t, msgBytes, dst[:n2], "Error decoding messages.")
 
 	n3, err := msg.Decode(dst)
 
-	require.NoError(t, err, "Error decoding message.")
-	require.Equal(t, len(msgBytes), n3, "Error decoding message.")
+	require.NoError(t, err, "Error decoding messages.")
+	require.Equal(t, len(msgBytes), n3, "Error decoding messages.")
 }

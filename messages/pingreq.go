@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 // The PINGREQ Packet is sent from a Client to the Server. It can be used to:
 // 1. Indicate to the Server that the Client is alive in the absence of any other
@@ -25,7 +25,7 @@ type PingreqMessage struct {
 
 var _ Message = (*PingreqMessage)(nil)
 
-// NewPingreqMessage creates a new PINGREQ message.
+// NewPingreqMessage creates a new PINGREQ messages.
 func NewPingreqMessage() *PingreqMessage {
 	msg := &PingreqMessage{}
 	msg.SetType(PINGREQ)

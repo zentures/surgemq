@@ -21,9 +21,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/sessions"
-	"github.com/surgemq/surgemq/topics"
+	"code.surgemq.com/messages"
+	"code.surgemq.com/sessions"
+	"code.surgemq.com/topics"
 )
 
 const (
@@ -54,8 +54,8 @@ type Client struct {
 
 // Connect is for MQTT clients to open a connection to a remote server. It needs to
 // know the URI, e.g., "tcp://127.0.0.1:1883", so it knows where to connect to. It also
-// needs to be supplied with the MQTT CONNECT message.
-func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error) {
+// needs to be supplied with the MQTT CONNECT messages.
+func (this *Client) Connect(uri string, msg *messages.ConnectMessage) (err error) {
 	this.checkConfiguration()
 
 	if msg == nil {
@@ -97,7 +97,7 @@ func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error)
 		return err
 	}
 
-	if resp.ReturnCode() != message.ConnectionAccepted {
+	if resp.ReturnCode() != messages.ConnectionAccepted {
 		return resp.ReturnCode()
 	}
 
@@ -141,7 +141,7 @@ func (this *Client) Connect(uri string, msg *message.ConnectMessage) (err error)
 // immediately after the message is sent to the outgoing buffer. For QOS 1 messages,
 // onComplete is called when PUBACK is received. For QOS 2 messages, onComplete is
 // called after the PUBCOMP message is received.
-func (this *Client) Publish(msg *message.PublishMessage, onComplete OnCompleteFunc) error {
+func (this *Client) Publish(msg *messages.PublishMessage, onComplete OnCompleteFunc) error {
 	return this.svc.publish(msg, onComplete)
 }
 
@@ -154,7 +154,7 @@ func (this *Client) Publish(msg *message.PublishMessage, onComplete OnCompleteFu
 // client subscribed to, the onPublish function is called to handle those messages.
 // So in effect, the client can supply different onPublish functions for different
 // topics.
-func (this *Client) Subscribe(msg *message.SubscribeMessage, onComplete OnCompleteFunc, onPublish OnPublishFunc) error {
+func (this *Client) Subscribe(msg *messages.SubscribeMessage, onComplete OnCompleteFunc, onPublish OnPublishFunc) error {
 	return this.svc.subscribe(msg, onComplete, onPublish)
 }
 
@@ -163,7 +163,7 @@ func (this *Client) Subscribe(msg *message.SubscribeMessage, onComplete OnComple
 // completion, which is when the client receives a UNSUBACK message from the server,
 // the supplied onComplete function is called. The client will no longer handle
 // messages from the server for those unsubscribed topics.
-func (this *Client) Unsubscribe(msg *message.UnsubscribeMessage, onComplete OnCompleteFunc) error {
+func (this *Client) Unsubscribe(msg *messages.UnsubscribeMessage, onComplete OnCompleteFunc) error {
 	return this.svc.unsubscribe(msg, onComplete)
 }
 
@@ -175,13 +175,13 @@ func (this *Client) Ping(onComplete OnCompleteFunc) error {
 }
 
 // Disconnect sends a single DISCONNECT message to the server. The client immediately
-// terminates after the sending of the DISCONNECT message.
+// terminates after the sending of the DISCONNECT messages.
 func (this *Client) Disconnect() {
-	//msg := message.NewDisconnectMessage()
+	//msg := messages.NewDisconnectMessage()
 	this.svc.stop()
 }
 
-func (this *Client) getSession(svc *service, req *message.ConnectMessage, resp *message.ConnackMessage) error {
+func (this *Client) getSession(svc *service, req *messages.ConnectMessage, resp *messages.ConnackMessage) error {
 	//id := string(req.ClientId())
 	svc.sess = &sessions.Session{}
 	return svc.sess.Init(req)

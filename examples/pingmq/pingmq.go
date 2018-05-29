@@ -70,8 +70,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/surge/netx"
-	"github.com/surgemq/message"
-	"github.com/surgemq/surgemq/service"
+	"code.surgemq.com/messages"
+	"code.surgemq.com/service"
 )
 
 type strlist []string
@@ -171,7 +171,7 @@ func pinger() {
 			}
 
 			// Creates a new PUBLISH message with the appropriate contents for publishing
-			pubmsg := message.NewPublishMessage()
+			pubmsg := messages.NewPublishMessage()
 			if pr.Err != nil {
 				pubmsg.SetTopic([]byte(fmt.Sprintf("/ping/failure/%s", pr.Src)))
 			} else {
@@ -224,7 +224,7 @@ func client(cmd *cobra.Command, args []string) {
 	c = &service.Client{}
 
 	// Creates a new MQTT CONNECT message and sets the proper parameters
-	msg := message.NewConnectMessage()
+	msg := messages.NewConnectMessage()
 	msg.SetVersion(4)
 	msg.SetCleanSession(true)
 	msg.SetClientId([]byte(fmt.Sprintf("pingmqclient%d%d", os.Getpid(), time.Now().Unix())))
@@ -236,7 +236,7 @@ func client(cmd *cobra.Command, args []string) {
 	}
 
 	// Creates a new SUBSCRIBE message to subscribe to topic "abc"
-	submsg := message.NewSubscribeMessage()
+	submsg := messages.NewSubscribeMessage()
 
 	for _, t := range clientTopics {
 		submsg.AddTopic([]byte(t), 0)
@@ -247,7 +247,7 @@ func client(cmd *cobra.Command, args []string) {
 	<-done
 }
 
-func onPublish(msg *message.PublishMessage) error {
+func onPublish(msg *messages.PublishMessage) error {
 	pr := &netx.PingResult{}
 	if err := pr.GobDecode(msg.Payload()); err != nil {
 		log.Printf("Error decoding ping result: %v\n", err)

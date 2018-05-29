@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import "fmt"
 
@@ -61,7 +61,7 @@ func (this *ConnackMessage) SetSessionPresent(v bool) {
 	this.dirty = true
 }
 
-// ReturnCode returns the return code received for the CONNECT message. The return
+// ReturnCode returns the return code received for the CONNECT messages. The return
 // type is an error
 func (this *ConnackMessage) ReturnCode() ConnackCode {
 	return this.returnCode

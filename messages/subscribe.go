@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ type SubscribeMessage struct {
 
 var _ Message = (*SubscribeMessage)(nil)
 
-// NewSubscribeMessage creates a new SUBSCRIBE message.
+// NewSubscribeMessage creates a new SUBSCRIBE messages.
 func NewSubscribeMessage() *SubscribeMessage {
 	msg := &SubscribeMessage{}
 	msg.SetType(SUBSCRIBE)
@@ -88,7 +88,7 @@ func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 	return nil
 }
 
-// RemoveTopic removes a single topic from the list of existing ones in the message.
+// RemoveTopic removes a single topic from the list of existing ones in the messages.
 // If topic does not exist it just does nothing.
 func (this *SubscribeMessage) RemoveTopic(topic []byte) {
 	var i int
@@ -133,7 +133,7 @@ func (this *SubscribeMessage) TopicQos(topic []byte) byte {
 	return QosFailure
 }
 
-// Qos returns the list of QoS current in the message.
+// Qos returns the list of QoS current in the messages.
 func (this *SubscribeMessage) Qos() []byte {
 	return this.qos
 }

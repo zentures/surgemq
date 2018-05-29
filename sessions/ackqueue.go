@@ -20,7 +20,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 var (
@@ -32,12 +32,12 @@ var (
 
 type ackmsg struct {
 	// Message type of the message waiting for ack
-	Mtype message.MessageType
+	Mtype messages.MessageType
 
 	// Current state of the ack-waiting message
-	State message.MessageType
+	State messages.MessageType
 
-	// Packet ID of the message. Every message that require ack'ing must have a valid
+	// Packet ID of the messages. Every message that require ack'ing must have a valid
 	// packet ID. Messages that have message I
 	Pktid uint16
 
@@ -103,29 +103,29 @@ func newAckqueue(n int) *Ackqueue {
 
 // Wait() copies the message into a waiting queue, and waits for the corresponding
 // ack message to be received.
-func (this *Ackqueue) Wait(msg message.Message, onComplete interface{}) error {
+func (this *Ackqueue) Wait(msg messages.Message, onComplete interface{}) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	switch msg := msg.(type) {
-	case *message.PublishMessage:
-		if msg.QoS() == message.QosAtMostOnce {
+	case *messages.PublishMessage:
+		if msg.QoS() == messages.QosAtMostOnce {
 			//return fmt.Errorf("QoS 0 messages don't require ack")
 			return errWaitMessage
 		}
 
 		this.insert(msg.PacketId(), msg, onComplete)
 
-	case *message.SubscribeMessage:
+	case *messages.SubscribeMessage:
 		this.insert(msg.PacketId(), msg, onComplete)
 
-	case *message.UnsubscribeMessage:
+	case *messages.UnsubscribeMessage:
 		this.insert(msg.PacketId(), msg, onComplete)
 
-	case *message.PingreqMessage:
+	case *messages.PingreqMessage:
 		this.ping = ackmsg{
-			Mtype:      message.PINGREQ,
-			State:      message.RESERVED,
+			Mtype:      messages.PINGREQ,
+			State:      messages.RESERVED,
 			OnComplete: onComplete,
 		}
 
@@ -137,12 +137,12 @@ func (this *Ackqueue) Wait(msg message.Message, onComplete interface{}) error {
 }
 
 // Ack() takes the ack message supplied and updates the status of messages waiting.
-func (this *Ackqueue) Ack(msg message.Message) error {
+func (this *Ackqueue) Ack(msg messages.Message) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	switch msg.Type() {
-	case message.PUBACK, message.PUBREC, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
+	case messages.PUBACK, messages.PUBREC, messages.PUBREL, messages.PUBCOMP, messages.SUBACK, messages.UNSUBACK:
 		// Check to see if the message w/ the same packet ID is in the queue
 		i, ok := this.emap[msg.PacketId()]
 		if ok {
@@ -157,14 +157,14 @@ func (this *Ackqueue) Ack(msg message.Message) error {
 			if err != nil {
 				return err
 			}
-			//glog.Debugf("Acked: %v", msg)
+			//commons.Log.Debug("Acked: %v", msg)
 			//} else {
-			//glog.Debugf("Cannot ack %s message with packet ID %d", msg.Type(), msg.PacketId())
+			//commons.Log.Debug("Cannot ack %s message with packet ID %d", msg.Type(), msg.PacketId())
 		}
 
-	case message.PINGRESP:
-		if this.ping.Mtype == message.PINGREQ {
-			this.ping.State = message.PINGRESP
+	case messages.PINGRESP:
+		if this.ping.Mtype == messages.PINGREQ {
+			this.ping.State = messages.PINGRESP
 		}
 
 	default:
@@ -181,7 +181,7 @@ func (this *Ackqueue) Acked() []ackmsg {
 
 	this.ackdone = this.ackdone[0:0]
 
-	if this.ping.State == message.PINGRESP {
+	if this.ping.State == messages.PINGRESP {
 		this.ackdone = append(this.ackdone, this.ping)
 		this.ping = ackmsg{}
 	}
@@ -189,7 +189,7 @@ func (this *Ackqueue) Acked() []ackmsg {
 FORNOTEMPTY:
 	for !this.empty() {
 		switch this.ring[this.head].State {
-		case message.PUBACK, message.PUBREL, message.PUBCOMP, message.SUBACK, message.UNSUBACK:
+		case messages.PUBACK, messages.PUBREL, messages.PUBCOMP, messages.SUBACK, messages.UNSUBACK:
 			this.ackdone = append(this.ackdone, this.ring[this.head])
 			this.removeHead()
 
@@ -201,7 +201,7 @@ FORNOTEMPTY:
 	return this.ackdone
 }
 
-func (this *Ackqueue) insert(pktid uint16, msg message.Message, onComplete interface{}) error {
+func (this *Ackqueue) insert(pktid uint16, msg messages.Message, onComplete interface{}) error {
 	if this.full() {
 		this.grow()
 	}
@@ -213,7 +213,7 @@ func (this *Ackqueue) insert(pktid uint16, msg message.Message, onComplete inter
 		// ackmsg
 		am := ackmsg{
 			Mtype:      msg.Type(),
-			State:      message.RESERVED,
+			State:      messages.RESERVED,
 			Pktid:      msg.PacketId(),
 			Msgbuf:     make([]byte, ml),
 			OnComplete: onComplete,
@@ -230,7 +230,7 @@ func (this *Ackqueue) insert(pktid uint16, msg message.Message, onComplete inter
 	} else {
 		// If packet w/ pktid already exist, then this must be a PUBLISH message
 		// Other message types should never send with the same packet ID
-		pm, ok := msg.(*message.PublishMessage)
+		pm, ok := msg.(*messages.PublishMessage)
 		if !ok {
 			return fmt.Errorf("ack/insert: duplicate packet ID for %s message", msg.Name())
 		}

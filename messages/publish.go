@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ type PublishMessage struct {
 
 var _ Message = (*PublishMessage)(nil)
 
-// NewPublishMessage creates a new PUBLISH message.
+// NewPublishMessage creates a new PUBLISH messages.
 func NewPublishMessage() *PublishMessage {
 	msg := &PublishMessage{}
 	msg.SetType(PUBLISH)
@@ -116,12 +116,12 @@ func (this *PublishMessage) SetTopic(v []byte) error {
 	return nil
 }
 
-// Payload returns the application message that's part of the PUBLISH message.
+// Payload returns the application message that's part of the PUBLISH messages.
 func (this *PublishMessage) Payload() []byte {
 	return this.payload
 }
 
-// SetPayload sets the application message that's part of the PUBLISH message.
+// SetPayload sets the application message that's part of the PUBLISH messages.
 func (this *PublishMessage) SetPayload(v []byte) {
 	this.payload = v
 	this.dirty = true

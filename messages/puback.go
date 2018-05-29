@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 import "fmt"
 
@@ -23,7 +23,7 @@ type PubackMessage struct {
 
 var _ Message = (*PubackMessage)(nil)
 
-// NewPubackMessage creates a new PUBACK message.
+// NewPubackMessage creates a new PUBACK messages.
 func NewPubackMessage() *PubackMessage {
 	msg := &PubackMessage{}
 	msg.SetType(PUBACK)

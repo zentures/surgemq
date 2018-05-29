@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package message
+package messages
 
 type PubrecMessage struct {
 	PubackMessage
@@ -22,7 +22,7 @@ type PubrecMessage struct {
 // packet of the QoS 2 protocol exchange.
 var _ Message = (*PubrecMessage)(nil)
 
-// NewPubrecMessage creates a new PUBREC message.
+// NewPubrecMessage creates a new PUBREC messages.
 func NewPubrecMessage() *PubrecMessage {
 	msg := &PubrecMessage{}
 	msg.SetType(PUBREC)

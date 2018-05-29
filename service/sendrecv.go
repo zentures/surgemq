@@ -21,8 +21,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/surge/glog"
-	"github.com/surgemq/message"
+	""
+	"code.surgemq.com/messages"
 )
 
 type netReader interface {
@@ -47,21 +47,21 @@ func (this *service) receiver() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			glog.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			commons.Log.Error("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 
-		glog.Debugf("(%s) Stopping receiver", this.cid())
+		commons.Log.Debug("(%s) Stopping receiver", this.cid())
 	}()
 
-	glog.Debugf("(%s) Starting receiver", this.cid())
+	commons.Log.Debug("(%s) Starting receiver", this.cid())
 
 	this.wgStarted.Done()
 
 	switch conn := this.conn.(type) {
 	case net.Conn:
-		//glog.Debugf("server/handleConnection: Setting read deadline to %d", time.Second*time.Duration(this.keepAlive))
+		//commons.Log.Debug("server/handleConnection: Setting read deadline to %d", time.Second*time.Duration(this.keepAlive))
 		keepAlive := time.Second * time.Duration(this.keepAlive)
 		r := timeoutReader{
 			d:    keepAlive + (keepAlive / 2),
@@ -73,17 +73,17 @@ func (this *service) receiver() {
 
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%s) error reading from connection: %v", this.cid(), err)
+					commons.Log.Error("(%s) error reading from connection: %v", this.cid(), err)
 				}
 				return
 			}
 		}
 
 	//case *websocket.Conn:
-	//	glog.Errorf("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
+	//	commons.Log.Error("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
 
 	default:
-		glog.Errorf("(%s) %v", this.cid(), ErrInvalidConnectionType)
+		commons.Log.Error("(%s) %v", this.cid(), ErrInvalidConnectionType)
 	}
 }
 
@@ -92,15 +92,15 @@ func (this *service) sender() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			glog.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			commons.Log.Error("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 
-		glog.Debugf("(%s) Stopping sender", this.cid())
+		commons.Log.Debug("(%s) Stopping sender", this.cid())
 	}()
 
-	glog.Debugf("(%s) Starting sender", this.cid())
+	commons.Log.Debug("(%s) Starting sender", this.cid())
 
 	this.wgStarted.Done()
 
@@ -111,23 +111,23 @@ func (this *service) sender() {
 
 			if err != nil {
 				if err != io.EOF {
-					glog.Errorf("(%s) error writing data: %v", this.cid(), err)
+					commons.Log.Error("(%s) error writing data: %v", this.cid(), err)
 				}
 				return
 			}
 		}
 
 	//case *websocket.Conn:
-	//	glog.Errorf("(%s) Websocket not supported", this.cid())
+	//	commons.Log.Error("(%s) Websocket not supported", this.cid())
 
 	default:
-		glog.Errorf("(%s) Invalid connection type", this.cid())
+		commons.Log.Error("(%s) Invalid connection type", this.cid())
 	}
 }
 
 // peekMessageSize() reads, but not commits, enough bytes to determine the size of
 // the next message and returns the type and size.
-func (this *service) peekMessageSize() (message.MessageType, int, error) {
+func (this *service) peekMessageSize() (messages.MessageType, int, error) {
 	var (
 		b   []byte
 		err error
@@ -172,19 +172,19 @@ func (this *service) peekMessageSize() (message.MessageType, int, error) {
 	// Total message length is remlen + 1 (msg type) + m (remlen bytes)
 	total := int(remlen) + 1 + m
 
-	mtype := message.MessageType(b[0] >> 4)
+	mtype := messages.MessageType(b[0] >> 4)
 
 	return mtype, total, err
 }
 
 // peekMessage() reads a message from the buffer, but the bytes are NOT committed.
 // This means the buffer still thinks the bytes are not read yet.
-func (this *service) peekMessage(mtype message.MessageType, total int) (message.Message, int, error) {
+func (this *service) peekMessage(mtype messages.MessageType, total int) (messages.Message, int, error) {
 	var (
 		b    []byte
 		err  error
 		i, n int
-		msg  message.Message
+		msg  messages.Message
 	)
 
 	if this.in == nil {
@@ -216,12 +216,12 @@ func (this *service) peekMessage(mtype message.MessageType, total int) (message.
 
 // readMessage() reads and copies a message from the buffer. The buffer bytes are
 // committed as a result of the read.
-func (this *service) readMessage(mtype message.MessageType, total int) (message.Message, int, error) {
+func (this *service) readMessage(mtype messages.MessageType, total int) (messages.Message, int, error) {
 	var (
 		b   []byte
 		err error
 		n   int
-		msg message.Message
+		msg messages.Message
 	)
 
 	if this.in == nil {
@@ -238,7 +238,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 	for l < total {
 		n, err = this.in.Read(this.intmp[l:])
 		l += n
-		glog.Debugf("read %d bytes, total %d", n, l)
+		commons.Log.Debug("read %d bytes, total %d", n, l)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -256,7 +256,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 }
 
 // writeMessage() writes a message to the outgoing buffer
-func (this *service) writeMessage(msg message.Message) (int, error) {
+func (this *service) writeMessage(msg messages.Message) (int, error) {
 	var (
 		l    int = msg.Len()
 		m, n int

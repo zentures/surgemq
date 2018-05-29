@@ -26,7 +26,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/surgemq/message"
+	"code.surgemq.com/messages"
 )
 
 const (
@@ -62,8 +62,8 @@ type TopicsProvider interface {
 	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
 	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
-	Retain(msg *message.PublishMessage) error
-	Retained(topic []byte, msgs *[]*message.PublishMessage) error
+	Retain(msg *messages.PublishMessage) error
+	Retained(topic []byte, msgs *[]*messages.PublishMessage) error
 	Close() error
 }
 
@@ -108,11 +108,11 @@ func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qo
 	return this.p.Subscribers(topic, qos, subs, qoss)
 }
 
-func (this *Manager) Retain(msg *message.PublishMessage) error {
+func (this *Manager) Retain(msg *messages.PublishMessage) error {
 	return this.p.Retain(msg)
 }
 
-func (this *Manager) Retained(topic []byte, msgs *[]*message.PublishMessage) error {
+func (this *Manager) Retained(topic []byte, msgs *[]*messages.PublishMessage) error {
 	return this.p.Retained(topic, msgs)
 }
 
