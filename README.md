@@ -5,7 +5,7 @@ SurgeMQ
 
 SurgeMQ is a high performance MQTT broker and client library that aims to be fully compliant with MQTT 3.1 and 3.1.1 specs. The primary package that's of interest is package [service](http://godoc.org/github.com/surgemq/surgemq/service). It provides the MQTT Server and Client services in a library form.
 
-SurgeMQ development is currently **on hold**, unfortunately, due to my focus on [Sequence](http://github.com/trustpath/sequence). If you would like to contribute and become a collaborator, please let me know. There's quite a bit of interest for the project, and I would love to see it succeed. 
+SurgeMQ development is currently **on hold and unmaintained**. 
 
 **This project should be considered unstable until further notice.**
 
