@@ -113,7 +113,7 @@ Then multiple clients can subscribe to results based on their different needs. F
 
 #### Server Example
 
-```
+```go
 // Create a new server
 svr := &service.Server{
     KeepAlive:        300,               // seconds
@@ -128,7 +128,7 @@ svr.ListenAndServe("tcp://:1883")
 ```
 #### Client Example
 
-```
+```go
 // Instantiates a new Client
 c := &Client{}
 
