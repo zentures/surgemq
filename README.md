@@ -9,6 +9,8 @@ SurgeMQ development is currently **on hold and unmaintained**.
 
 **This project should be considered unstable until further notice.**
 
+**Please check out [VolantMQ](https://github.com/VolantMQ/volantmq) as an alternative.**
+
 ### MQTT
 
 According to the [MQTT spec](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html):
