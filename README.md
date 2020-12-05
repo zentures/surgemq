@@ -111,7 +111,7 @@ limitations under the License.
 
 Then multiple clients can subscribe to results based on their different needs. For example, a client maybe only interested in any failed ping attempts, as that would indicate a host might be down. After a certain number of failures the client may then raise some type of flag to indicate host down.
 
-`pingmq` is available [here](https://github.com/surgemq/surgemq/tree/master/cmd/pingmq) and documentation is available at [godoc](http://godoc.org/github.com/surgemq/surgemq/cmd/pingmq). It utilizes [surge/ping](https://github.com/surge/ping) to perform the pings.
+`pingmq` is available [here](https://github.com/influxdata/surgemq/tree/master/examples/pingmq) and documentation is available at [godoc](https://github.com/influxdata/surgemq/tree/master/examples/pingmq). It utilizes [surge/ping](https://github.com/surge/ping) to perform the pings.
 
 #### Server Example
 
