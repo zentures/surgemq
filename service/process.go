@@ -101,7 +101,12 @@ func (this *service) processor() {
 
 func (this *service) processIncoming(msg message.Message) error {
 	var err error = nil
-
+	if this.messageFilter != nil {
+		err = this.messageFilter(this.sess.Cmsg, msg)
+		if err != nil {
+			return err
+		}
+	}
 	switch msg := msg.(type) {
 	case *message.PublishMessage:
 		// For PUBLISH message, we should figure out what QoS it is and process accordingly

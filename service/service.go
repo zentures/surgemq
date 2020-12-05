@@ -118,9 +118,10 @@ type service struct {
 	intmp  []byte
 	outtmp []byte
 
-	subs  []interface{}
-	qoss  []byte
-	rmsgs []*message.PublishMessage
+	subs          []interface{}
+	qoss          []byte
+	rmsgs         []*message.PublishMessage
+	messageFilter MessageFilterFunc
 }
 
 func (this *service) start() error {
