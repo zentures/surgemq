@@ -125,8 +125,12 @@ func (this *memTopics) Retained(topic []byte, msgs *[]*message.PublishMessage) e
 }
 
 func (this *memTopics) Close() error {
+	this.smu.Lock()
 	this.sroot = nil
+	this.smu.Unlock()
+	this.rmu.Lock()
 	this.rroot = nil
+	this.rmu.Unlock()
 	return nil
 }
 

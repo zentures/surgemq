@@ -174,7 +174,7 @@ func (this *service) processIncoming(msg message.Message) error {
 
 	case *message.DisconnectMessage:
 		// For DISCONNECT message, we should quit
-		this.sess.Cmsg.SetWillFlag(false)
+		this.sess.SetWillFlag(false)
 		return errDisconnect
 
 	default:
